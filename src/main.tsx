@@ -3,6 +3,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { AppLoader } from './components/AppLoader'
 import { routeTree } from './routeTree.gen'
 
 const router = createRouter({ routeTree })
@@ -30,7 +31,9 @@ ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <RouterProvider router={router} />
+      <AppLoader>
+        <RouterProvider router={router} />
+      </AppLoader>
     </ThemeProvider>
   </React.StrictMode>
 )

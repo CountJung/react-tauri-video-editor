@@ -45,14 +45,17 @@
 
 ## Phase 2 — Timeline UI & Clip 배치 & DnD
 
-- [ ] **TimelinePanel** — 눈금자(Ruler) 정밀 구현 (zoom 연동)
-- [ ] **TimelinePanel** — 트랙 레이아웃 (비디오/오디오 구분)
-- [ ] **TimelinePanel** — Asset → Timeline 드래그앤드롭 (`addClip`)
-- [ ] **TimelinePanel** — Clip 이동 (`moveClip`, dnd-kit)
-- [ ] **TimelinePanel** — 줌 (wheel 이벤트, `setZoom`)
-- [ ] **TimelinePanel** — 수평 스크롤
-- [ ] **TimelinePanel** — 플레이헤드 클릭/드래그 (`setCurrentTime`)
-- [ ] **TimelinePanel** — Snap to grid 동작 확인
+- [x] **AppLoader** — HTML 스플래시 (`index.html`) + React 부트 진행 화면 (`AppLoader.tsx`)
+- [x] **TimelinePanel** — 눈금자(Ruler) 정밀 구현 (zoom 연동, 적응형 tick 간격)
+- [x] **TimelinePanel** — 트랙 레이아웃 (비디오/오디오 구분, sticky 레이블)
+- [x] **TimelinePanel** — Asset → Timeline 드래그앤드롭 (`addClip`)
+- [x] **TimelinePanel** — Clip 이동 (`moveClip`, dnd-kit)
+- [x] **TimelinePanel** — 줌 (Ctrl+Wheel / 툴바 버튼, `setZoom`)
+- [x] **TimelinePanel** — 수평 스크롤
+- [x] **TimelinePanel** — 플레이헤드 클릭 seek (`setCurrentTime`, snap 적용)
+- [x] **TimelinePanel** — Snap to grid 동작 확인
+- [x] **EditorLayout** — DndContext / DragOverlay 통합
+- [x] **AssetPanel** — `useDraggable` DraggableAssetItem 구현
 
 ---
 

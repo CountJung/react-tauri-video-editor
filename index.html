@@ -4,8 +4,44 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Video Editor</title>
+    <style>
+      /* JS 로드 전 즉시 표시되는 HTML 스플래시 */
+      #splash {
+        position: fixed;
+        inset: 0;
+        background: #1a1a1a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        z-index: 9999;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #fff;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+      }
+      #splash.hidden { opacity: 0; visibility: hidden; }
+      .s-icon  { font-size: 50px; line-height: 1; }
+      .s-title { font-size: 17px; font-weight: 600; letter-spacing: 0.05em; color: #ddd; margin: 0; }
+      .s-spin  {
+        width: 30px; height: 30px;
+        border: 3px solid #2a2a2a;
+        border-top-color: #2196f3;
+        border-radius: 50%;
+        animation: sp 0.75s linear infinite;
+      }
+      @keyframes sp { to { transform: rotate(360deg); } }
+      .s-msg { font-size: 12px; color: #555; margin: 0; }
+    </style>
   </head>
   <body>
+    <!-- JS 번들 로드 전 즉시 노출되는 스플래시 -->
+    <div id="splash">
+      <div class="s-icon">🎬</div>
+      <h1 class="s-title">Video Editor</h1>
+      <div class="s-spin"></div>
+      <p class="s-msg">시작하는 중...</p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

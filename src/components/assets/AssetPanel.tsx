@@ -1,6 +1,7 @@
 import { convertFileSrc, tauriInvoke, tauriListen } from '@/lib/invoke'
 import { useAssetStore } from '@/store/assetStore'
 import type { Asset } from '@/store/timelineStore'
+import { useDraggable } from '@dnd-kit/core'
 import AddIcon from '@mui/icons-material/Add'
 import AudiotrackIcon from '@mui/icons-material/Audiotrack'
 import ImageIcon from '@mui/icons-material/Image'
@@ -34,6 +35,95 @@ function AssetTypeIcon({ type }: { type: Asset['type'] }) {
   if (type === 'video') return <VideocamIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
   if (type === 'audio') return <AudiotrackIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
   return <ImageIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+}
+
+/** 드래그 가능한 에셋 아이템 */
+function DraggableAssetItem({
+  asset,
+  isSelected,
+  isLoading,
+  onSelect,
+}: {
+  asset: Asset
+  isSelected: boolean
+  isLoading: boolean
+  onSelect: () => void
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: asset.id,
+    data: { type: 'asset', asset },
+  })
+
+  return (
+    <Box
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={onSelect}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        p: 0.5,
+        mb: 0.5,
+        borderRadius: 1,
+        cursor: isDragging ? 'grabbing' : 'grab',
+        bgcolor: isSelected ? 'action.selected' : 'transparent',
+        opacity: isDragging ? 0.45 : 1,
+        userSelect: 'none',
+        '&:hover': {
+          bgcolor: isSelected ? 'action.selected' : 'action.hover',
+        },
+      }}
+    >
+      {/* 썸네일 */}
+      <Box
+        sx={{
+          width: 48,
+          height: 32,
+          bgcolor: 'grey.900',
+          borderRadius: 0.5,
+          overflow: 'hidden',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {isLoading ? (
+          <CircularProgress size={14} />
+        ) : asset.thumbnailPath ? (
+          <Box
+            component="img"
+            src={convertFileSrc(asset.thumbnailPath)}
+            alt=""
+            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <AssetTypeIcon type={asset.type} />
+        )}
+      </Box>
+
+      {/* 파일명 + 길이 */}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          title={asset.name}
+        >
+          {asset.name}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+          {formatDuration(asset.duration)}
+        </Typography>
+      </Box>
+    </Box>
+  )
 }
 
 /** 에셋 패널 — 파일 임포트 및 목록 표시 (Phase 1) */
@@ -215,76 +305,15 @@ export function AssetPanel() {
       ) : (
         // 에셋 목록
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
-          {assets.map((asset) => {
-            const isLoading = loadingIds.has(asset.id)
-            const isSelected = asset.id === selectedAssetId
-            return (
-              <Box
-                key={asset.id}
-                onClick={() => setSelectedAsset(asset.id)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  p: 0.5,
-                  mb: 0.5,
-                  borderRadius: 1,
-                  cursor: 'pointer',
-                  bgcolor: isSelected ? 'action.selected' : 'transparent',
-                  '&:hover': {
-                    bgcolor: isSelected ? 'action.selected' : 'action.hover',
-                  },
-                }}
-              >
-                {/* 썸네일 */}
-                <Box
-                  sx={{
-                    width: 48,
-                    height: 32,
-                    bgcolor: 'grey.900',
-                    borderRadius: 0.5,
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {isLoading ? (
-                    <CircularProgress size={14} />
-                  ) : asset.thumbnailPath ? (
-                    <Box
-                      component="img"
-                      src={convertFileSrc(asset.thumbnailPath)}
-                      alt=""
-                      sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <AssetTypeIcon type={asset.type} />
-                  )}
-                </Box>
-
-                {/* 파일명 + 길이 */}
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: 'block',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={asset.name}
-                  >
-                    {asset.name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
-                    {formatDuration(asset.duration)}
-                  </Typography>
-                </Box>
-              </Box>
-            )
-          })}
+          {assets.map((asset) => (
+            <DraggableAssetItem
+              key={asset.id}
+              asset={asset}
+              isSelected={asset.id === selectedAssetId}
+              isLoading={loadingIds.has(asset.id)}
+              onSelect={() => setSelectedAsset(asset.id)}
+            />
+          ))}
         </Box>
       )}
     </Box>
