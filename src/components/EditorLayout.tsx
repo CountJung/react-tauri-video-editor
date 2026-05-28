@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from '@/lib/storageKeys'
+import { useStickyState } from '@/lib/useStickyState'
 import { useAssetStore } from '@/store/assetStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import {
@@ -13,6 +15,7 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { AssetPanel } from './assets/AssetPanel'
+import { LayoutResizer } from './common/LayoutResizer'
 import { PreviewPlayer } from './preview/PreviewPlayer'
 import { TimelinePanel } from './timeline/TimelinePanel'
 
@@ -35,6 +38,9 @@ export function EditorLayout() {
   const addClip = useTimelineStore((s) => s.addClip)
   const moveClip = useTimelineStore((s) => s.moveClip)
   const [overlayInfo, setOverlayInfo] = useState<OverlayInfo | null>(null)
+
+  const [assetWidth, setAssetWidth] = useStickyState(240, STORAGE_KEYS.PANEL_ASSET_WIDTH)
+  const [previewHeight, setPreviewHeight] = useStickyState(300, STORAGE_KEYS.PANEL_PREVIEW_HEIGHT)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -78,13 +84,14 @@ export function EditorLayout() {
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
-        {/* 좌측: 에셋 패널 */}
+        {/* 좌측: 에셋 패널 (너비 조절 가능) */}
         <Box
           sx={{
-            width: 240,
-            minWidth: 180,
-            borderRight: 1,
-            borderColor: 'divider',
+            width: assetWidth,
+            minWidth: 160,
+            maxWidth: 500,
+            flexShrink: 0,
+            borderRight: 0,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -93,13 +100,28 @@ export function EditorLayout() {
           <AssetPanel />
         </Box>
 
+        <LayoutResizer
+          direction="vertical"
+          onResize={(d) => setAssetWidth((w) => Math.max(160, Math.min(500, w + d)))}
+        />
+
         {/* 우측: 프리뷰 + 타임라인 */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
-            sx={{ flex: '0 0 40%', borderBottom: 1, borderColor: 'divider', overflow: 'hidden' }}
+            sx={{
+              height: previewHeight,
+              minHeight: 120,
+              flexShrink: 0,
+              borderBottom: 0,
+              overflow: 'hidden',
+            }}
           >
             <PreviewPlayer />
           </Box>
+          <LayoutResizer
+            direction="horizontal"
+            onResize={(d) => setPreviewHeight((h) => Math.max(120, Math.min(600, h + d)))}
+          />
           <Box sx={{ flex: 1, overflow: 'hidden' }}>
             <TimelinePanel />
           </Box>

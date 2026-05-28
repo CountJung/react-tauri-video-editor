@@ -61,11 +61,24 @@
 
 ## Phase 3 — Trim & Playback Sync
 
-- [ ] **Clip Trim** — 좌우 핸들 드래그로 trimStart/trimEnd 조정
-- [ ] **Clip Trim** — 최소 duration 제한 (0.1초)
-- [ ] **PreviewPlayer** — currentTime ↔ 타임라인 플레이헤드 동기화
-- [ ] **PreviewPlayer** — 재생 시 플레이헤드 자동 이동
-- [ ] **TimelinePanel** — Clip 겹침 방지 (resolveCollisions)
+- [x] **Clip Trim** — 좌우 핸들 드래그로 trimStart/trimEnd 조정
+- [x] **Clip Trim** — 최소 duration 제한 (0.1초)
+- [x] **PreviewPlayer** — currentTime ↔ 타임라인 플레이헤드 동기화 (ruler 클릭 → 비디오 seek)
+- [x] **PreviewPlayer** — 재생 시 플레이헤드 자동 이동 (timeupdate → setCurrentTime)
+- [x] **TimelinePanel** — Clip 겹침 방지 (resolveCollisions)
+
+---
+
+## Phase 3-b — 레이아웃 리사이저 & 설정
+
+- [x] **LayoutResizer** — 드래그로 패널 크기 조절 (좌우 에셋 패널, 상하 프리뷰/타임라인)
+- [x] **useStickyState** — localStorage 연동 패널 크기 영구 저장
+- [x] **settingsStore** — 앱 설정 Zustand 스토어 (themeMode)
+- [x] **.env** — `VITE_THEME_MODE`, `VITE_DEFAULT_ZOOM`, `VITE_SNAP_INTERVAL` 기본값
+- [x] **AppThemeProvider** — settingsStore 기반 동적 MUI 테마 (dark/light/system)
+- [x] **GlobalAppBar** — `__root.tsx`에 앱 바 추가 (설정 아이콘, 뒤로가기)
+- [x] **/settings 라우트** — 테마 모드 선택, 줌 슬라이더, 스냅 간격 선택
+- [x] **파일 드래그 버그 수정** — Tauri 2.x `tauri://drag-drop` 이벤트명 및 payload 형식 수정
 
 ---
 

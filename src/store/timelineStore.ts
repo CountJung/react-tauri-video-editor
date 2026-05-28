@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '@/lib/storageKeys'
 import { create } from 'zustand'
 
 // ---- 데이터 모델 -------------------------------------------------------
@@ -77,7 +78,20 @@ interface TimelineActions {
   removeClip: (clipId: string) => void
   setCurrentTime: (time: number) => void
   setZoom: (zoom: number) => void
+  setSnapInterval: (interval: number) => void
   setPlaying: (playing: boolean) => void
+}
+
+// .env 기본값 읽기: localStorage 저장값 → VITE_* 환경변수 → 하드코딩 기본값 순
+function readStoredNumber(key: string, envVal: string | undefined, fallback: number): number {
+  try {
+    const raw = localStorage.getItem(key)
+    if (raw !== null) return JSON.parse(raw) as number
+  } catch {
+    // ignore
+  }
+  const parsed = Number(envVal)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
 export const useTimelineStore = create<TimelineState & TimelineActions>((set, get) => ({
@@ -87,8 +101,12 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
   ],
   currentTime: 0,
   duration: 0,
-  zoom: 50,
-  snapInterval: 0.5,
+  zoom: readStoredNumber(STORAGE_KEYS.SETTINGS_DEFAULT_ZOOM, import.meta.env.VITE_DEFAULT_ZOOM, 50),
+  snapInterval: readStoredNumber(
+    STORAGE_KEYS.SETTINGS_SNAP_INTERVAL,
+    import.meta.env.VITE_SNAP_INTERVAL,
+    0.5
+  ),
   isPlaying: false,
 
   addTrack: (type) =>
@@ -169,6 +187,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
 
   setCurrentTime: (time) => set({ currentTime: Math.max(0, time) }),
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),
+  setSnapInterval: (interval) => set({ snapInterval: Math.max(0.05, interval) }),
   setPlaying: (playing) => {
     if (playing) {
       const { currentTime, duration } = get()

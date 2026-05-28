@@ -58,6 +58,70 @@ function computeTicks(totalSecs: number, zoom: number): Tick[] {
   return ticks
 }
 
+// ── TrimHandle ────────────────────────────────────────────────────────────────
+interface TrimHandleProps {
+  side: 'start' | 'end'
+  clip: Clip
+  zoom: number
+}
+
+function TrimHandle({ side, clip, zoom }: TrimHandleProps) {
+  const trimClipStart = useTimelineStore((s) => s.trimClipStart)
+  const trimClipEnd = useTimelineStore((s) => s.trimClipEnd)
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation() // dnd-kit 드래그 방지
+      e.preventDefault()
+
+      const startX = e.clientX
+      const startTrimStart = clip.trimStart
+      const startTrimEnd = clip.trimEnd
+
+      document.body.style.cursor = 'ew-resize'
+      document.body.style.userSelect = 'none'
+
+      function onMouseMove(ev: MouseEvent) {
+        const delta = (ev.clientX - startX) / zoom
+        if (side === 'start') {
+          trimClipStart(clip.id, startTrimStart + delta)
+        } else {
+          trimClipEnd(clip.id, startTrimEnd + delta)
+        }
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+    },
+    [clip, zoom, side, trimClipStart, trimClipEnd]
+  )
+
+  return (
+    <Box
+      onPointerDown={handlePointerDown}
+      sx={{
+        position: 'absolute',
+        [side === 'start' ? 'left' : 'right']: 0,
+        top: 0,
+        bottom: 0,
+        width: 8,
+        cursor: 'ew-resize',
+        bgcolor: 'rgba(255,255,255,0.12)',
+        zIndex: 3,
+        flexShrink: 0,
+        '&:hover': { bgcolor: 'rgba(255,255,255,0.4)' },
+      }}
+    />
+  )
+}
+
 // ── ClipItem (draggable) ──────────────────────────────────────────────────────
 interface ClipItemProps {
   clip: Clip
@@ -99,13 +163,15 @@ function ClipItem({ clip, trackType, zoom }: ClipItemProps) {
         '&:hover': { filter: 'brightness(1.2)' },
       }}
     >
+      <TrimHandle side="start" clip={clip} zoom={zoom} />
       <Typography
         variant="caption"
         noWrap
-        sx={{ fontSize: 10, color: '#fff', pointerEvents: 'none' }}
+        sx={{ fontSize: 10, color: '#fff', pointerEvents: 'none', flex: 1, textAlign: 'center' }}
       >
         {assetName}
       </Typography>
+      <TrimHandle side="end" clip={clip} zoom={zoom} />
     </Box>
   )
 }

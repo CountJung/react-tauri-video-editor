@@ -28,6 +28,8 @@ export function PreviewPlayer() {
   const isSyncingRef = useRef(false)
   // asset?.id를 추적해 thumbnailPath 변경 시 재로드 방지
   const prevAssetIdRef = useRef<string | undefined>(undefined)
+  // 비디오 timeupdate에서 마지막으로 설정한 currentTime을 추적 (외부 seek 판별용)
+  const lastVideoTimeRef = useRef(0)
 
   const [localCurrentTime, setLocalCurrentTime] = useState(0)
   const [localDuration, setLocalDuration] = useState(0)
@@ -118,6 +120,7 @@ export function PreviewPlayer() {
   const handleVideoTimeUpdate = useCallback(() => {
     const video = videoRef.current
     if (!video || isSyncingRef.current) return
+    lastVideoTimeRef.current = video.currentTime
     setLocalCurrentTime(video.currentTime)
     setCurrentTime(video.currentTime)
   }, [setCurrentTime])
@@ -134,6 +137,30 @@ export function PreviewPlayer() {
     setCurrentTime(0)
     if (videoRef.current) videoRef.current.currentTime = 0
   }, [setPlaying, setCurrentTime])
+
+  // 타임라인 currentTime 외부 변경 감지 → 비디오/오디오 seek
+  // (ruler 클릭 등으로 currentTime이 바뀌면 프리뷰도 해당 위치로 이동)
+  const storeCurrentTime = useTimelineStore((s) => s.currentTime)
+  useEffect(() => {
+    // 비디오 timeupdate에서 설정한 값과 같으면 피드백 루프이므로 skip
+    if (Math.abs(lastVideoTimeRef.current - storeCurrentTime) < 0.05) return
+    if (!asset) return
+
+    isSyncingRef.current = true
+    lastVideoTimeRef.current = storeCurrentTime
+    setLocalCurrentTime(storeCurrentTime)
+
+    if (asset.type === 'video' && videoRef.current) {
+      videoRef.current.currentTime = storeCurrentTime
+    } else if (asset.type === 'audio' && wavesurferRef.current) {
+      const dur = wavesurferRef.current.getDuration()
+      if (dur > 0) wavesurferRef.current.seekTo(storeCurrentTime / dur)
+    }
+
+    setTimeout(() => {
+      isSyncingRef.current = false
+    }, 50)
+  }, [storeCurrentTime, asset])
 
   const handleSliderChange = useCallback((_: Event, value: number | number[]) => {
     const time = Array.isArray(value) ? value[0] : value
