@@ -1,0 +1,335 @@
+name: Build & Release
+
+# ─── 트리거 ───────────────────────────────────────────────────
+# 버전 태그(v*.*.*) 푸시 또는 수동 실행
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # GitHub Release 생성·업로드에 필요
+
+# ─── 공통 환경 설정 ───────────────────────────────────────────
+env:
+  PNPM_VERSION: '10.30.3'
+  NODE_VERSION: '22'
+
+# ═══════════════════════════════════════════════════════════════
+# JOB 1 — Windows (NSIS 설치 파일)
+# ═══════════════════════════════════════════════════════════════
+jobs:
+  build-windows:
+    name: Windows Build (NSIS)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Node.js + pnpm ──
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      # ── Rust ──
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+
+      # ── 의존성 설치 ──
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── .env 주입 (GitHub Secret → 프로젝트 루트 .env) ──
+      # Secret 'APP_ENV'에 .env 파일 전체 내용을 저장하세요.
+      - name: Create .env
+        shell: bash
+        run: printf '%s' "$APP_ENV" > .env
+        env:
+          APP_ENV: ${{ secrets.APP_ENV }}
+
+      # ── Tauri 빌드 ──
+      # beforeBuildCommand: prepare-tauri-bundle-env → build:vite → build:server
+      # TAURI_SIGNING_PRIVATE_KEY 가 설정된 경우에만 env에 주입 (비어있으면 Tauri 에러 발생 방지)
+      - name: Prepare signing env (Windows)
+        id: signing_env_win
+        shell: bash
+        run: |
+          if [ -n "$SIGN_KEY" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY=$SIGN_KEY" >> "$GITHUB_ENV"
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$SIGN_PASS" >> "$GITHUB_ENV"
+            echo "signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signing=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          SIGN_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGN_PASS: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Build Tauri app (Windows)
+        run: pnpm build
+
+      # publish.cjs 가 publish/ 아래에 결과물을 배치한다 (postbuild 훅).
+      # ── 아티팩트 업로드 ──
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          # publish.cjs 출력 경로
+          path: |
+            publish/ArielGUI_setup.exe
+            publish/ArielGUI_setup.zip
+            publish/ArielGUI_setup_msi.zip
+            publish/ArielGUI_web-server.zip
+            publish/version.json
+            publish/index.html
+          if-no-files-found: error
+
+# ═══════════════════════════════════════════════════════════════
+# JOB 2 — macOS Apple Silicon (DMG)
+# ═══════════════════════════════════════════════════════════════
+  build-macos-arm64:
+    name: macOS Build (Apple Silicon)
+    runs-on: macos-14   # M1 runner (aarch64)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Node.js + pnpm ──
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      # ── Rust ──
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+
+      # ── 의존성 설치 ──
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── .env 주입 ──
+      - name: Create .env
+        run: printf '%s' "$APP_ENV" > .env
+        env:
+          APP_ENV: ${{ secrets.APP_ENV }}
+
+      # ── Tauri 빌드 ──
+      # macOS 코드 서명은 선택 사항입니다.
+      # Apple Developer 계정이 있다면 아래 secret 들을 설정하세요:
+      #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+      #   APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+      - name: Prepare signing env (macOS)
+        shell: bash
+        run: |
+          if [ -n "$SIGN_KEY" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY=$SIGN_KEY" >> "$GITHUB_ENV"
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$SIGN_PASS" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$APPLE_CERT" ]; then
+            echo "APPLE_CERTIFICATE=$APPLE_CERT" >> "$GITHUB_ENV"
+            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERT_PASS" >> "$GITHUB_ENV"
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGN_ID" >> "$GITHUB_ENV"
+            echo "APPLE_ID=$_APPLE_ID" >> "$GITHUB_ENV"
+            echo "APPLE_PASSWORD=$APPLE_PASS" >> "$GITHUB_ENV"
+            echo "APPLE_TEAM_ID=$APPLE_TID" >> "$GITHUB_ENV"
+          fi
+        env:
+          SIGN_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGN_PASS: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERT_PASS: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGN_ID: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          _APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASS: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build Tauri app (macOS arm64)
+        run: pnpm build
+
+      # publish.cjs 는 macOS DMG 를 처리하지 않으므로 직접 수집
+      - name: Collect macOS DMG
+        run: |
+          mkdir -p publish
+          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | sort | tail -1)
+          if [ -z "$DMG" ]; then
+            echo "::error::DMG 파일을 찾을 수 없습니다"
+            exit 1
+          fi
+          cp "$DMG" publish/ArielGUI_arm64.dmg
+          echo "Collected: $DMG → publish/ArielGUI_arm64.dmg"
+
+      # version.json / index.html 은 publish.cjs 가 이미 생성
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-installer
+          path: |
+            publish/ArielGUI_arm64.dmg
+            publish/version.json
+            publish/index.html
+          if-no-files-found: error
+
+# ═══════════════════════════════════════════════════════════════
+# JOB 3 — GitHub Release 생성 & 파일 첨부
+# ═══════════════════════════════════════════════════════════════
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-macos-arm64]
+    runs-on: ubuntu-latest
+
+    outputs:
+      release_id: ${{ steps.release.outputs.id }}
+      tag_name: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - name: Resolve tag name
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v-manual-$(date +'%Y%m%d-%H%M%S')" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/windows
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64-installer
+          path: dist/macos
+
+      - name: Show collected files
+        run: find dist/ -type f | sort
+
+      - name: Read version.json
+        id: ver
+        run: |
+          VERSION=$(jq -r '.version' dist/windows/version.json 2>/dev/null || echo "unknown")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "ArielGUI ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## ArielGUI ${{ steps.tag.outputs.tag }}
+
+            ### 다운로드
+            | 플랫폼 | 파일 |
+            |--------|------|
+            | Windows (NSIS) | `ArielGUI_setup.exe` |
+            | Windows (MSI)  | `ArielGUI_setup_msi.zip` |
+            | macOS Apple Silicon | `ArielGUI_arm64.dmg` |
+            | Web Server 패키지 | `ArielGUI_web-server.zip` |
+
+            앱 버전: `${{ steps.ver.outputs.version }}`
+          draft: false
+          prerelease: false
+          files: |
+            dist/windows/ArielGUI_setup.exe
+            dist/windows/ArielGUI_setup.zip
+            dist/windows/ArielGUI_setup_msi.zip
+            dist/windows/ArielGUI_web-server.zip
+            dist/windows/version.json
+            dist/macos/ArielGUI_arm64.dmg
+          fail_on_unmatched_files: false
+
+# ═══════════════════════════════════════════════════════════════
+# JOB 4 — Tomcat 서버 배포
+# GitHub Release 아티팩트를 Tomcat 서버로 배포합니다.
+#
+# Repository Variables (Settings → Secrets and variables → Actions → Variables 탭):
+#   TOMCAT_HOST        — 서버 호스트 또는 IP
+#   TOMCAT_PORT        — SSH 포트 (기본 22)
+#   TOMCAT_DEPLOY_PATH — 배포 대상 경로 (예: /opt/tomcat/webapps/ariel)
+#
+# Repository Secrets (Settings → Secrets and variables → Actions → Secrets 탭):
+#   TOMCAT_USER        — SSH 접속 사용자명
+#   TOMCAT_SSH_KEY     — SSH 개인 키 (PEM 형식 전체 내용)
+# ═══════════════════════════════════════════════════════════════
+  deploy-tomcat:
+    name: Deploy to Tomcat
+    needs: create-release
+    runs-on: ubuntu-latest
+    # TOMCAT_HOST Repository Variable 이 설정된 경우에만 실행
+    # (Settings → Secrets and variables → Actions → Variables 탭에서 등록)
+    if: ${{ vars.TOMCAT_HOST != '' }}
+
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: deploy/
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64-installer
+          path: deploy/
+
+      - name: Show deploy files
+        run: ls -lh deploy/
+
+      # ── Tomcat 서버로 파일 전송 ──
+      - name: SCP files to Tomcat server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.TOMCAT_HOST }}
+          port: ${{ vars.TOMCAT_PORT || '22' }}
+          username: ${{ secrets.TOMCAT_USER }}
+          key: ${{ secrets.TOMCAT_SSH_KEY }}
+          source: 'deploy/*'
+          target: '${{ vars.TOMCAT_DEPLOY_PATH }}'
+          strip_components: 1   # deploy/ 접두어 제거
+          overwrite: true
+
+      # ── 배포 후 권한 정리 (선택사항) ──
+      - name: Fix permissions on Tomcat server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.TOMCAT_HOST }}
+          port: ${{ vars.TOMCAT_PORT || '22' }}
+          username: ${{ secrets.TOMCAT_USER }}
+          key: ${{ secrets.TOMCAT_SSH_KEY }}
+          script: |
+            DEPLOY_PATH="${{ vars.TOMCAT_DEPLOY_PATH }}"
+            echo "[deploy] 배포 경로: $DEPLOY_PATH"
+            ls -lh "$DEPLOY_PATH"
+            # 필요 시 Tomcat 재시작: sudo systemctl restart tomcat
