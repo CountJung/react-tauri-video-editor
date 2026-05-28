@@ -86,6 +86,17 @@
         "reveal": "always",
         "panel": "shared"
       }
+    },
+    {
+      "label": "install-ffmpeg",
+      "type": "shell",
+      "command": "pnpm install-ffmpeg",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }
