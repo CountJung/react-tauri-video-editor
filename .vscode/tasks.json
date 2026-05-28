@@ -1,0 +1,91 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "start-vite-dev-server",
+      "type": "shell",
+      "command": "pnpm dev:vite",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^.*(ERROR|error).*$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*vite.*$",
+          "endsPattern": "ready in"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "tauri-dev",
+      "type": "shell",
+      "command": "pnpm dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "cargo-check",
+      "type": "shell",
+      "command": "cargo check",
+      "options": {
+        "cwd": "${workspaceFolder}/src-tauri"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$rustc",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "cargo-clippy",
+      "type": "shell",
+      "command": "cargo clippy -- -D warnings",
+      "options": {
+        "cwd": "${workspaceFolder}/src-tauri"
+      },
+      "group": "build",
+      "problemMatcher": "$rustc",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "pnpm-typecheck",
+      "type": "shell",
+      "command": "pnpm typecheck",
+      "group": "build",
+      "problemMatcher": "$tsc",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "pnpm-fix",
+      "type": "shell",
+      "command": "pnpm fix",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

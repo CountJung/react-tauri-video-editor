@@ -69,6 +69,12 @@ pub async fn generate_thumbnail(
     time_sec: f64,
     output_path: String,
 ) -> Result<String, AppError> {
+    // 출력 디렉터리가 없으면 생성
+    if let Some(parent) = std::path::Path::new(&output_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| AppError::new("MKDIR_FAILED", e.to_string()))?;
+    }
+
     app.shell()
         .sidecar("ffmpeg")
         .map_err(|e| AppError::new("FFMPEG_NOT_FOUND", e.to_string()))?

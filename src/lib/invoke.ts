@@ -1,4 +1,4 @@
-import { type InvokeArgs, invoke } from '@tauri-apps/api/core'
+import { type InvokeArgs, convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { type EventCallback, type UnlistenFn, listen } from '@tauri-apps/api/event'
 
 /**
@@ -19,3 +19,6 @@ export async function tauriListen<T>(
 ): Promise<UnlistenFn> {
   return listen<T>(event, handler)
 }
+
+/** 로컬 파일 경로를 웹뷰에서 로드 가능한 URL로 변환 (asset:// 프로토콜) */
+export { convertFileSrc }

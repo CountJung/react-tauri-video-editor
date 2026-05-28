@@ -32,14 +32,14 @@
 
 ## Phase 1 — 파일 임포트 & Asset Panel & 기본 Preview
 
-- [ ] **AssetPanel** — 파일 드롭존 구현 (드래그앤드롭으로 파일 추가)
-- [ ] **AssetPanel** — `asset_import` Tauri 커맨드 연동
-- [ ] **AssetPanel** — `asset_probe` (ffprobe) 메타데이터 조회 연동
-- [ ] **AssetPanel** — 썸네일 생성 (`generate_thumbnail`) 연동
-- [ ] **AssetPanel** — 에셋 목록 UI (썸네일 + 파일명 + 길이 표시)
-- [ ] **PreviewPlayer** — HTML5 video 소스 연결 (선택된 에셋 재생)
-- [ ] **PreviewPlayer** — 재생/일시정지/시크 컨트롤 구현
-- [ ] **PreviewPlayer** — WaveSurfer.js 오디오 파형 표시
+- [x] **AssetPanel** — 파일 드롭존 구현 (드래그앤드롭으로 파일 추가)
+- [x] **AssetPanel** — `asset_import` Tauri 커맨드 연동
+- [x] **AssetPanel** — `asset_probe` (ffprobe) 메타데이터 조회 연동
+- [x] **AssetPanel** — 썸네일 생성 (`generate_thumbnail`) 연동
+- [x] **AssetPanel** — 에셋 목록 UI (썸네일 + 파일명 + 길이 표시)
+- [x] **PreviewPlayer** — HTML5 video 소스 연결 (선택된 에셋 재생)
+- [x] **PreviewPlayer** — 재생/일시정지/시크 컨트롤 구현
+- [x] **PreviewPlayer** — WaveSurfer.js 오디오 파형 표시
 
 ---
 
