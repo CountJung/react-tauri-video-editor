@@ -121,3 +121,26 @@ cargo clippy      # Rust lint
 - [ ] 하드코딩된 경로·값이 없는가?
 - [ ] `cargo clippy` / Biome 경고가 0인가?
 - [ ] 관련 문서·스킬 파일을 업데이트했는가?
+- [ ] 라이브러리 API 사용 전 `mcp_context7_query-docs`로 최신 버전 확인했는가?
+
+---
+
+## mcp_context7 라이브러리 문서 조회
+
+라이브러리 API 작성 전 반드시 `mcp_context7_query-docs`로 최신 문서를 조회한다.  
+훈련 데이터의 낡은 API 패턴 사용을 방지한다.
+
+### 절차
+
+1. `mcp_context7_resolve-library-id` → 라이브러리 ID 획득
+2. `mcp_context7_query-docs` → 구체적인 질문 조회 (질문당 최대 3회)
+3. 조회 결과 기준으로 코드 작성
+
+### 확정 Context7 라이브러리 ID
+
+| 라이브러리 | ID |
+|---|---|
+| Tauri 2 | `/tauri-apps/tauri-docs` |
+| Material UI v7 | `/websites/mui_material-ui` |
+| TanStack Router | `/tanstack/router` |
+| React Flow, Zustand, dnd-kit, WaveSurfer.js, Vite | `resolve-library-id`로 먼저 조회 |

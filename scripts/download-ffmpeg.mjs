@@ -10,15 +10,16 @@
  */
 
 import { execSync, execFileSync } from 'child_process'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, unlinkSync, rmSync } from 'fs'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, rmSync } from 'fs'
 import { get } from 'https'
 import { join, resolve } from 'path'
 import { fileURLToPath } from 'url'
-import { tmpdir } from 'os'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = resolve(__dirname, '..')
 const BINARIES_DIR = join(ROOT, 'src-tauri', 'binaries')
+// 임시 디렉터리를 프로젝트 내부에 두어 크로스 드라이브 rename 오류 방지
+const TMP_DIR = join(ROOT, 'src-tauri', 'binaries', '.tmp')
 const FFBINARIES_API = 'https://ffbinaries.com/api/v1/version/latest'
 
 // ── Rust host triple ────────────────────────────────────────────────────────
@@ -136,7 +137,8 @@ async function main() {
   if (!bins) throw new Error(`플랫폼 '${platform}'의 다운로드 URL을 찾을 수 없습니다.`)
   console.log(`ffbinaries 버전  : ${data.version}\n`)
 
-  const tmp = tmpdir()
+  // 임시 디렉터리를 프로젝트 내부(same drive)에 생성
+  if (!existsSync(TMP_DIR)) mkdirSync(TMP_DIR, { recursive: true })
 
   for (const { tool, dest } of targets) {
     if (existsSync(dest)) {
@@ -147,8 +149,8 @@ async function main() {
     const url = bins[tool]
     if (!url) throw new Error(`${tool}의 다운로드 URL 없음 (플랫폼: ${platform})`)
 
-    const zipPath = join(tmp, `${tool}-ffbinaries.zip`)
-    const extractDir = join(tmp, `${tool}-extract-${Date.now()}`)
+    const zipPath = join(TMP_DIR, `${tool}-ffbinaries.zip`)
+    const extractDir = join(TMP_DIR, `${tool}-extract-${Date.now()}`)
 
     // 이전 잔여 파일 정리
     if (existsSync(zipPath)) unlinkSync(zipPath)
@@ -163,7 +165,9 @@ async function main() {
     const exePath = findExe(extractDir, tool)
     if (!exePath) throw new Error(`압축 파일에서 ${tool} 실행파일을 찾을 수 없습니다.`)
 
-    renameSync(exePath, dest)
+    // renameSync 대신 copyFileSync+unlink — 크로스 드라이브 이동에도 안전
+    copyFileSync(exePath, dest)
+    unlinkSync(exePath)
 
     if (process.platform !== 'win32') {
       execSync(`chmod +x "${dest}"`)
@@ -175,6 +179,9 @@ async function main() {
 
     console.log(`✓ ${tool} → ${dest}\n`)
   }
+
+  // .tmp 디렉터리 최종 정리
+  if (existsSync(TMP_DIR)) rmSync(TMP_DIR, { recursive: true, force: true })
 
   console.log('=== FFmpeg 바이너리 설치 완료 ===')
   console.log('이제 "pnpm dev" 또는 "pnpm build"로 앱을 실행할 수 있습니다.')
