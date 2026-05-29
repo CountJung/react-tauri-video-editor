@@ -18,6 +18,7 @@ import { AssetPanel } from './assets/AssetPanel'
 import { LayoutResizer } from './common/LayoutResizer'
 import { PreviewPlayer } from './preview/PreviewPlayer'
 import { TimelinePanel } from './timeline/TimelinePanel'
+import { ToolPanel } from './toolbar/ToolPanel'
 
 interface OverlayInfo {
   label: string
@@ -113,10 +114,16 @@ export function EditorLayout() {
               minHeight: 120,
               flexShrink: 0,
               borderBottom: 0,
+              display: 'flex',
               overflow: 'hidden',
             }}
           >
-            <PreviewPlayer />
+            {/* 도구 패널 (선택/텍스트/도형/자르기/분할) */}
+            <ToolPanel />
+            {/* 프리뷰 플레이어 */}
+            <Box sx={{ flex: 1, overflow: 'hidden' }}>
+              <PreviewPlayer />
+            </Box>
           </Box>
           <LayoutResizer
             direction="horizontal"

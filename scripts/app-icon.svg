@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Clip region for the arm stripes -->
+    <clipPath id="armClip">
+      <rect x="56" y="104" width="400" height="88" rx="14"/>
+    </clipPath>
+    <!-- Subtle gradient for body -->
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e2d4e"/>
+      <stop offset="100%" stop-color="#131c31"/>
+    </linearGradient>
+    <!-- Glow for play button -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4a9eff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#4a9eff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ── Background rounded square ── -->
+  <rect width="512" height="512" rx="96" fill="#0d1117"/>
+
+  <!-- ══ Clapperboard body ══ -->
+  <rect x="56" y="188" width="400" height="272" rx="16" fill="url(#bodyGrad)"/>
+  <!-- Body border -->
+  <rect x="56" y="188" width="400" height="272" rx="16" fill="none" stroke="#1e3a6e" stroke-width="5"/>
+
+  <!-- Film info lines (left side of body) -->
+  <rect x="92" y="228" width="140" height="9" rx="4.5" fill="#3a7bd5" opacity="0.7"/>
+  <rect x="92" y="253" width="100" height="9" rx="4.5" fill="#3a7bd5" opacity="0.5"/>
+  <rect x="92" y="278" width="120" height="9" rx="4.5" fill="#3a7bd5" opacity="0.45"/>
+  <rect x="92" y="303" width="80" height="9" rx="4.5" fill="#3a7bd5" opacity="0.35"/>
+
+  <!-- Vertical divider -->
+  <rect x="264" y="204" width="2" height="240" fill="#1e3a6e" opacity="0.6"/>
+
+  <!-- Play button area (right side) -->
+  <circle cx="344" cy="324" r="88" fill="url(#glowGrad)"/>
+  <!-- Play triangle -->
+  <polygon points="316,288 316,360 384,324" fill="#4a9eff"/>
+
+  <!-- ══ Clapperboard arm (clapper stick) ══ -->
+  <!-- Black background for arm (goes behind stripes) -->
+  <rect x="56" y="104" width="400" height="88" rx="14" fill="#111111"/>
+
+  <!-- White diagonal stripes (clipped to arm rect) -->
+  <!-- Each stripe: parallelogram with 88px height → 88px horizontal shift at 45° -->
+  <!-- Stripes at intervals of 176px (88px white + 88px black) -->
+  <g clip-path="url(#armClip)">
+    <!-- Stripe 1: x_bottom=[−24..64], shifted right 88 → x_top=[64..152] -->
+    <polygon points="-24,192 64,192 152,104 64,104" fill="#ffffff"/>
+    <!-- Stripe 2: x_bottom=[152..240], x_top=[240..328] -->
+    <polygon points="152,192 240,192 328,104 240,104" fill="#ffffff"/>
+    <!-- Stripe 3: x_bottom=[328..416], x_top=[416..504] -->
+    <polygon points="328,192 416,192 504,104 416,104" fill="#ffffff"/>
+  </g>
+
+  <!-- Arm border -->
+  <rect x="56" y="104" width="400" height="88" rx="14" fill="none" stroke="#1e3a6e" stroke-width="5"/>
+
+  <!-- Hinge line between arm and body -->
+  <rect x="56" y="188" width="400" height="6" fill="#0d1117"/>
+
+  <!-- Hinge pivot points -->
+  <circle cx="84" cy="191" r="10" fill="#0d1117"/>
+  <circle cx="84" cy="191" r="6" fill="#3a7bd5"/>
+  <circle cx="428" cy="191" r="10" fill="#0d1117"/>
+  <circle cx="428" cy="191" r="6" fill="#3a7bd5"/>
+
+  <!-- Small film-strip holes on left/right edges of body -->
+  <circle cx="72" cy="236" r="6" fill="#0d1117"/>
+  <circle cx="72" cy="268" r="6" fill="#0d1117"/>
+  <circle cx="72" cy="300" r="6" fill="#0d1117"/>
+  <circle cx="72" cy="332" r="6" fill="#0d1117"/>
+  <circle cx="440" cy="236" r="6" fill="#0d1117"/>
+  <circle cx="440" cy="268" r="6" fill="#0d1117"/>
+  <circle cx="440" cy="300" r="6" fill="#0d1117"/>
+  <circle cx="440" cy="332" r="6" fill="#0d1117"/>
+</svg>
