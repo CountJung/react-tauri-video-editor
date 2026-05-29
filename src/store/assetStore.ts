@@ -20,7 +20,10 @@ export const useAssetStore = create<AssetState & AssetActions>((set) => ({
 
   addAsset: (asset) =>
     set((state) => ({
-      assets: state.assets.some((a) => a.id === asset.id) ? state.assets : [...state.assets, asset],
+      // id 또는 path 기준 중복 방지 (StrictMode 이중 호출, 동일 파일 재드롭 대비)
+      assets: state.assets.some((a) => a.id === asset.id || a.path === asset.path)
+        ? state.assets
+        : [...state.assets, asset],
     })),
 
   removeAsset: (id) =>

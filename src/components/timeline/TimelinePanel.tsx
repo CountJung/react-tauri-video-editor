@@ -125,7 +125,7 @@ function TrimHandle({ side, clip, zoom }: TrimHandleProps) {
 // ── ClipItem (draggable) ──────────────────────────────────────────────────────
 interface ClipItemProps {
   clip: Clip
-  trackType: 'video' | 'audio'
+  trackType: Track['type']
   zoom: number
 }
 
@@ -135,6 +135,11 @@ function ClipItem({ clip, trackType, zoom }: ClipItemProps) {
     id: clip.id,
     data: { type: 'clip', clipId: clip.id, clipName: assetName, originalStart: clip.start },
   })
+
+  const bgColor =
+    trackType === 'video' ? 'primary.dark' : trackType === 'overlay' ? '#6a1b9a' : 'success.dark'
+  const borderColor =
+    trackType === 'video' ? 'primary.main' : trackType === 'overlay' ? '#ab47bc' : 'success.main'
 
   return (
     <Box
@@ -147,9 +152,9 @@ function ClipItem({ clip, trackType, zoom }: ClipItemProps) {
         width: Math.max(clip.duration * zoom, 4),
         top: 4,
         height: TRACK_HEIGHT - 8,
-        bgcolor: trackType === 'video' ? 'primary.dark' : 'success.dark',
+        bgcolor: bgColor,
         border: '1px solid',
-        borderColor: trackType === 'video' ? 'primary.main' : 'success.main',
+        borderColor,
         borderRadius: 0.5,
         display: 'flex',
         alignItems: 'center',
@@ -189,8 +194,18 @@ function TrackRow({ track, zoom, contentWidth }: TrackRowProps) {
     data: { type: 'track', trackId: track.id },
   })
 
-  const bgColor = track.type === 'video' ? 'rgba(33,150,243,0.04)' : 'rgba(76,175,80,0.04)'
-  const labelColor = track.type === 'video' ? 'primary.main' : 'success.main'
+  const bgColor =
+    track.type === 'video'
+      ? 'rgba(33,150,243,0.04)'
+      : track.type === 'overlay'
+        ? 'rgba(156,39,176,0.06)'
+        : 'rgba(76,175,80,0.04)'
+  const labelColor =
+    track.type === 'video'
+      ? 'primary.main'
+      : track.type === 'overlay'
+        ? 'secondary.main'
+        : 'success.main'
 
   return (
     <Box
@@ -218,7 +233,7 @@ function TrackRow({ track, zoom, contentWidth }: TrackRowProps) {
         }}
       >
         <Typography variant="caption" sx={{ fontWeight: 700, color: labelColor }}>
-          {track.type === 'video' ? 'V' : 'A'}
+          {track.type === 'video' ? 'V' : track.type === 'overlay' ? 'OL' : 'A'}
         </Typography>
       </Box>
 

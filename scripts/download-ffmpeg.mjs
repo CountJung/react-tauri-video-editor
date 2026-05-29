@@ -9,11 +9,11 @@
  * - rustc -vV 로 호스트 triple 자동 감지
  */
 
-import { execSync, execFileSync } from 'child_process'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, rmSync } from 'fs'
-import { get } from 'https'
-import { join, resolve } from 'path'
-import { fileURLToPath } from 'url'
+import { execSync, execFileSync } from 'node:child_process'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, rmSync } from 'node:fs'
+import { get } from 'node:https'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = resolve(__dirname, '..')
@@ -159,7 +159,7 @@ async function main() {
     console.log(`⬇  ${tool} 다운로드 중...`)
     console.log(`   URL: ${url}`)
     await download(url, zipPath)
-    console.log(`   압축 해제 중...`)
+    console.log('   압축 해제 중...')
     extractZip(zipPath, extractDir)
 
     const exePath = findExe(extractDir, tool)

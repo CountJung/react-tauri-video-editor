@@ -198,16 +198,30 @@ export function AssetPanel() {
   // Tauri 전역 파일 드롭 이벤트 등록
   // Tauri 2.x 이벤트: tauri://drag-enter, tauri://drag-leave, tauri://drag-drop
   // payload: { paths: string[]; position?: { x: number; y: number } }
+  // cancelled 플래그: React StrictMode 이중 마운트 시 async tauriListen 이중 등록 방지
   useEffect(() => {
+    let cancelled = false
     const unlisteners: Array<() => void> = []
     ;(async () => {
       try {
         const unEnter = await tauriListen<{ paths: string[] }>('tauri://drag-enter', () => {
           setIsDragging(true)
         })
+        if (cancelled) {
+          unEnter()
+          return
+        }
+        unlisteners.push(unEnter)
+
         const unLeave = await tauriListen<void>('tauri://drag-leave', () => {
           setIsDragging(false)
         })
+        if (cancelled) {
+          unLeave()
+          return
+        }
+        unlisteners.push(unLeave)
+
         const unDrop = await tauriListen<{ paths: string[]; position?: { x: number; y: number } }>(
           'tauri://drag-drop',
           (event) => {
@@ -215,12 +229,17 @@ export function AssetPanel() {
             handleFilePaths(event.payload.paths)
           }
         )
-        unlisteners.push(unEnter, unLeave, unDrop)
+        if (cancelled) {
+          unDrop()
+          return
+        }
+        unlisteners.push(unDrop)
       } catch {
         // Tauri 환경이 아닐 때 무시
       }
     })()
     return () => {
+      cancelled = true
       for (const fn of unlisteners) fn()
     }
   }, [handleFilePaths])

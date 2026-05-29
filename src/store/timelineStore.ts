@@ -25,9 +25,16 @@ export interface Clip {
   trimEnd: number // 원본 자르기 끝 (초)
 }
 
+/** 트랙 타입:
+ * - video: 주 비디오/이미지 편집 트랙
+ * - audio: 오디오 트랙
+ * - overlay: 비디오 위에 이미지를 겹치는 오버레이 트랙
+ */
+export type TrackType = 'video' | 'audio' | 'overlay'
+
 export interface Track {
   id: string
-  type: 'video' | 'audio'
+  type: TrackType
   clips: Clip[]
 }
 
@@ -69,7 +76,7 @@ interface TimelineState {
 }
 
 interface TimelineActions {
-  addTrack: (type: 'video' | 'audio') => void
+  addTrack: (type: TrackType) => void
   removeTrack: (trackId: string) => void
   addClip: (trackId: string, asset: Asset, startSec: number) => void
   moveClip: (clipId: string, newStart: number) => void
@@ -97,6 +104,7 @@ function readStoredNumber(key: string, envVal: string | undefined, fallback: num
 export const useTimelineStore = create<TimelineState & TimelineActions>((set, get) => ({
   tracks: [
     { id: 'track-v1', type: 'video', clips: [] },
+    { id: 'track-ol1', type: 'overlay', clips: [] },
     { id: 'track-a1', type: 'audio', clips: [] },
   ],
   currentTime: 0,

@@ -1,5 +1,6 @@
 import { convertFileSrc } from '@/lib/invoke'
 import { useAssetStore } from '@/store/assetStore'
+import type { Asset, Clip, Track } from '@/store/timelineStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
@@ -7,8 +8,7 @@ import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import Slider from '@mui/material/Slider'
 import Typography from '@mui/material/Typography'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type WaveSurferType from 'wavesurfer.js'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -16,82 +16,101 @@ function formatTime(sec: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-/** 미디어 프리뷰 플레이어 (Phase 1) */
+/** 특정 시간에 활성화된 클립 + 에셋 반환 */
+function findActiveClip(
+  tracks: Track[],
+  assets: Asset[],
+  currentTime: number,
+  trackType: Track['type']
+): { clip: Clip; asset: Asset } | null {
+  for (const track of tracks) {
+    if (track.type !== trackType) continue
+    for (const clip of track.clips) {
+      if (currentTime >= clip.start && currentTime < clip.start + clip.duration) {
+        const asset = assets.find((a) => a.id === clip.assetId)
+        if (asset) return { clip, asset }
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * 타임라인 합성 프리뷰 플레이어
+ *
+ * - 비디오 트랙: currentTime에 활성화된 클립의 영상/이미지를 표시
+ * - 오버레이 트랙: currentTime에 활성화된 이미지 클립을 비디오 위에 오버레이
+ * - 이미지 클립: 해당 구간에서 정지 이미지 표시, 재생 시 타이머로 시간 진행
+ */
 export function PreviewPlayer() {
-  const { assets, selectedAssetId } = useAssetStore()
-  const { isPlaying, setPlaying, setCurrentTime } = useTimelineStore()
-  const asset = assets.find((a) => a.id === selectedAssetId) ?? null
+  const assets = useAssetStore((s) => s.assets)
+  const tracks = useTimelineStore((s) => s.tracks)
+  const duration = useTimelineStore((s) => s.duration)
+  const isPlaying = useTimelineStore((s) => s.isPlaying)
+  const storeCurrentTime = useTimelineStore((s) => s.currentTime)
+  const { setPlaying, setCurrentTime } = useTimelineStore()
 
   const videoRef = useRef<HTMLVideoElement>(null)
-  const waveformRef = useRef<HTMLDivElement>(null)
-  const wavesurferRef = useRef<WaveSurferType | null>(null)
   const isSyncingRef = useRef(false)
-  // asset?.id를 추적해 thumbnailPath 변경 시 재로드 방지
-  const prevAssetIdRef = useRef<string | undefined>(undefined)
-  // 비디오 timeupdate에서 마지막으로 설정한 currentTime을 추적 (외부 seek 판별용)
   const lastVideoTimeRef = useRef(0)
+  const rafRef = useRef<number | null>(null)
+  const rafLastTimestampRef = useRef<number | null>(null)
+  // RAF에서 최신 값을 읽기 위한 ref (스테일 클로저 방지)
+  const currentTimeRef = useRef(storeCurrentTime)
+  const durationRef = useRef(duration)
 
   const [localCurrentTime, setLocalCurrentTime] = useState(0)
-  const [localDuration, setLocalDuration] = useState(0)
   const [isSliderDragging, setIsSliderDragging] = useState(false)
 
-  // 에셋 ID 변경 시에만 소스 재로드 (thumbnailPath 변경 무시)
+  // RAF/callback에서 최신 값을 읽을 수 있도록 ref 동기화
   useEffect(() => {
-    if (asset?.id === prevAssetIdRef.current) return
-    prevAssetIdRef.current = asset?.id
+    currentTimeRef.current = storeCurrentTime
+  }, [storeCurrentTime])
+  useEffect(() => {
+    durationRef.current = duration
+  }, [duration])
 
-    setLocalCurrentTime(0)
-    setLocalDuration(asset?.duration ?? 0)
-    setPlaying(false)
+  // 현재 시간에 활성화된 비디오 트랙 콘텐츠 (video or image)
+  const activeVideoContent = useMemo(
+    () => findActiveClip(tracks, assets, storeCurrentTime, 'video'),
+    [tracks, assets, storeCurrentTime]
+  )
 
-    if (!asset) return
-
-    if (asset.type === 'video') {
-      wavesurferRef.current?.destroy()
-      wavesurferRef.current = null
-      const video = videoRef.current
-      if (video) {
-        video.src = convertFileSrc(asset.path)
-        video.load()
+  // 현재 시간에 활성화된 오버레이 클립 목록
+  const activeOverlays = useMemo(() => {
+    const result: Array<{ clip: Clip; asset: Asset }> = []
+    for (const track of tracks) {
+      if (track.type !== 'overlay') continue
+      for (const clip of track.clips) {
+        if (storeCurrentTime >= clip.start && storeCurrentTime < clip.start + clip.duration) {
+          const asset = assets.find((a) => a.id === clip.assetId)
+          if (asset?.type === 'image') result.push({ clip, asset })
+        }
       }
-    } else if (asset.type === 'audio') {
-      // WaveSurfer 초기화 (동적 import로 번들 크기 최적화)
-      ;(async () => {
-        const WaveSurfer = (await import('wavesurfer.js')).default
-        if (!waveformRef.current) return
-        wavesurferRef.current?.destroy()
-        const ws = WaveSurfer.create({
-          container: waveformRef.current,
-          waveColor: '#4fc3f7',
-          progressColor: '#0288d1',
-          url: convertFileSrc(asset.path),
-          height: 80,
-          interact: true,
-        })
-        ws.on('ready', (duration) => {
-          setLocalDuration(duration)
-        })
-        ws.on('timeupdate', (currentTime) => {
-          if (!isSyncingRef.current) {
-            setLocalCurrentTime(currentTime)
-            setCurrentTime(currentTime)
-          }
-        })
-        ws.on('finish', () => {
-          setPlaying(false)
-          setLocalCurrentTime(0)
-          setCurrentTime(0)
-        })
-        wavesurferRef.current = ws
-      })()
     }
-  }, [asset, setPlaying, setCurrentTime])
+    return result
+  }, [tracks, assets, storeCurrentTime])
 
-  // isPlaying 변경 → 비디오/오디오 재생·정지 동기화
+  const activeAsset = activeVideoContent?.asset ?? null
+  const activeClip = activeVideoContent?.clip ?? null
+
+  // 활성 비디오 에셋 변경 시 video 소스 교체
+  const prevAssetIdRef = useRef<string | undefined>(undefined)
   useEffect(() => {
-    if (!asset) return
+    if (activeAsset?.id === prevAssetIdRef.current) return
+    prevAssetIdRef.current = activeAsset?.id
 
-    if (asset.type === 'video') {
+    if (activeAsset?.type === 'video' && videoRef.current) {
+      videoRef.current.src = convertFileSrc(activeAsset.path)
+      videoRef.current.load()
+    }
+  }, [activeAsset])
+
+  // isPlaying + activeAsset 변경 → 재생/정지 제어
+  useEffect(() => {
+    if (!activeAsset) return
+
+    if (activeAsset.type === 'video') {
       const video = videoRef.current
       if (!video) return
       if (isPlaying) {
@@ -99,68 +118,100 @@ export function PreviewPlayer() {
       } else {
         video.pause()
       }
-    } else if (asset.type === 'audio') {
-      const ws = wavesurferRef.current
-      if (!ws) return
+    } else if (activeAsset.type === 'image') {
+      // 이미지 재생: RAF로 타임라인 시간 진행
       if (isPlaying) {
-        ws.play()
+        rafLastTimestampRef.current = null
+        const advance = (ts: number) => {
+          if (rafLastTimestampRef.current !== null) {
+            const delta = (ts - rafLastTimestampRef.current) / 1000
+            const next = Math.min(currentTimeRef.current + delta, durationRef.current)
+            currentTimeRef.current = next
+            setLocalCurrentTime(next)
+            setCurrentTime(next)
+            if (next >= durationRef.current) {
+              setPlaying(false)
+              return
+            }
+          }
+          rafLastTimestampRef.current = ts
+          rafRef.current = requestAnimationFrame(advance)
+        }
+        rafRef.current = requestAnimationFrame(advance)
       } else {
-        ws.pause()
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current)
+          rafRef.current = null
+        }
       }
     }
-  }, [isPlaying, asset, setPlaying])
 
-  // 언마운트 시 WaveSurfer 정리
-  useEffect(() => {
     return () => {
-      wavesurferRef.current?.destroy()
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
     }
-  }, [])
+  }, [isPlaying, activeAsset, setPlaying, setCurrentTime])
 
+  // video timeupdate → 타임라인 currentTime 갱신 (clip offset 보정)
   const handleVideoTimeUpdate = useCallback(() => {
     const video = videoRef.current
-    if (!video || isSyncingRef.current) return
+    if (!video || isSyncingRef.current || !activeClip) return
+    // video.currentTime은 clip 내부 시간 (trimStart 기준)
+    const timelineTime = activeClip.start + (video.currentTime - activeClip.trimStart)
     lastVideoTimeRef.current = video.currentTime
-    setLocalCurrentTime(video.currentTime)
-    setCurrentTime(video.currentTime)
-  }, [setCurrentTime])
+    setLocalCurrentTime(timelineTime)
+    setCurrentTime(timelineTime)
+  }, [activeClip, setCurrentTime])
 
   const handleVideoLoadedMetadata = useCallback(() => {
     const video = videoRef.current
-    if (!video) return
-    setLocalDuration(video.duration)
-  }, [])
+    if (!video || !activeClip) return
+    // 활성 클립의 trimStart로 seek
+    const seekTo = activeClip.trimStart + (storeCurrentTime - activeClip.start)
+    video.currentTime = Math.max(activeClip.trimStart, Math.min(activeClip.trimEnd, seekTo))
+  }, [activeClip, storeCurrentTime])
 
   const handleVideoEnded = useCallback(() => {
     setPlaying(false)
-    setLocalCurrentTime(0)
-    setCurrentTime(0)
-    if (videoRef.current) videoRef.current.currentTime = 0
-  }, [setPlaying, setCurrentTime])
+  }, [setPlaying])
 
-  // 타임라인 currentTime 외부 변경 감지 → 비디오/오디오 seek
-  // (ruler 클릭 등으로 currentTime이 바뀌면 프리뷰도 해당 위치로 이동)
-  const storeCurrentTime = useTimelineStore((s) => s.currentTime)
+  // 외부 currentTime 변경 → video seek (ruler 클릭, 슬라이더 등)
   useEffect(() => {
-    // 비디오 timeupdate에서 설정한 값과 같으면 피드백 루프이므로 skip
-    if (Math.abs(lastVideoTimeRef.current - storeCurrentTime) < 0.05) return
-    if (!asset) return
+    if (!activeClip || activeAsset?.type !== 'video') return
+    const video = videoRef.current
+    if (!video) return
+
+    const expectedVideoTime = activeClip.trimStart + (storeCurrentTime - activeClip.start)
+    if (Math.abs(lastVideoTimeRef.current - expectedVideoTime) < 0.05) return
 
     isSyncingRef.current = true
-    lastVideoTimeRef.current = storeCurrentTime
+    lastVideoTimeRef.current = expectedVideoTime
     setLocalCurrentTime(storeCurrentTime)
-
-    if (asset.type === 'video' && videoRef.current) {
-      videoRef.current.currentTime = storeCurrentTime
-    } else if (asset.type === 'audio' && wavesurferRef.current) {
-      const dur = wavesurferRef.current.getDuration()
-      if (dur > 0) wavesurferRef.current.seekTo(storeCurrentTime / dur)
-    }
+    video.currentTime = Math.max(
+      activeClip.trimStart,
+      Math.min(activeClip.trimEnd, expectedVideoTime)
+    )
 
     setTimeout(() => {
       isSyncingRef.current = false
     }, 50)
-  }, [storeCurrentTime, asset])
+  }, [storeCurrentTime, activeClip, activeAsset?.type])
+
+  // storeCurrentTime 외부 변경 시 localCurrentTime 동기화
+  useEffect(() => {
+    if (!isSliderDragging) {
+      setLocalCurrentTime(storeCurrentTime)
+    }
+  }, [storeCurrentTime, isSliderDragging])
+
+  // 언마운트 시 RAF 정리
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
 
   const handleSliderChange = useCallback((_: Event, value: number | number[]) => {
     const time = Array.isArray(value) ? value[0] : value
@@ -171,27 +222,15 @@ export function PreviewPlayer() {
   const handleSliderChangeCommitted = useCallback(
     (_: Event | React.SyntheticEvent, value: number | number[]) => {
       const time = Array.isArray(value) ? value[0] : value
-      isSyncingRef.current = true
       setIsSliderDragging(false)
       setLocalCurrentTime(time)
       setCurrentTime(time)
-
-      if (asset?.type === 'video' && videoRef.current) {
-        videoRef.current.currentTime = time
-      } else if (asset?.type === 'audio' && wavesurferRef.current) {
-        const dur = wavesurferRef.current.getDuration()
-        wavesurferRef.current.seekTo(dur > 0 ? time / dur : 0)
-      }
-
-      setTimeout(() => {
-        isSyncingRef.current = false
-      }, 100)
     },
-    [asset?.type, setCurrentTime]
+    [setCurrentTime]
   )
 
-  const canPlay = !!asset && asset.type !== 'image'
-  const displayTime = isSliderDragging ? localCurrentTime : localCurrentTime
+  const totalDuration = duration || 1
+  const canPlay = duration > 0
 
   return (
     <Box
@@ -212,31 +251,56 @@ export function PreviewPlayer() {
           justifyContent: 'center',
           overflow: 'hidden',
           minHeight: 0,
+          position: 'relative',
         }}
       >
-        {!asset ? (
+        {/* 빈 상태 */}
+        {!activeAsset && activeOverlays.length === 0 && (
           <Box sx={{ color: 'text.disabled', fontSize: 14 }}>Preview</Box>
-        ) : asset.type === 'video' ? (
-          // biome-ignore lint/a11y/useMediaCaption: 비디오 에디터 프리뷰 — 자막 불필요
-          <video
-            ref={videoRef}
-            style={{ maxWidth: '100%', maxHeight: '100%' }}
-            onTimeUpdate={handleVideoTimeUpdate}
-            onLoadedMetadata={handleVideoLoadedMetadata}
-            onEnded={handleVideoEnded}
-          />
-        ) : asset.type === 'audio' ? (
-          <Box sx={{ width: '100%', px: 2 }}>
-            <div ref={waveformRef} />
-          </Box>
-        ) : (
+        )}
+
+        {/* 메인 비디오 (항상 렌더, 소스 없으면 숨김) */}
+        {/* biome-ignore lint/a11y/useMediaCaption: 비디오 에디터 프리뷰 */}
+        <video
+          ref={videoRef}
+          style={{
+            maxWidth: '100%',
+            maxHeight: '100%',
+            display: activeAsset?.type === 'video' ? 'block' : 'none',
+          }}
+          onTimeUpdate={handleVideoTimeUpdate}
+          onLoadedMetadata={handleVideoLoadedMetadata}
+          onEnded={handleVideoEnded}
+        />
+
+        {/* 이미지 클립 (비디오 트랙에 배치된 이미지) */}
+        {activeAsset?.type === 'image' && (
           <Box
             component="img"
-            src={convertFileSrc(asset.path)}
-            alt={asset.name}
+            src={convertFileSrc(activeAsset.path)}
+            alt={activeAsset.name}
             sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
           />
         )}
+
+        {/* 오버레이 이미지 (overlay 트랙 클립 — 비디오 위에 겹침) */}
+        {activeOverlays.map(({ clip, asset: overlayAsset }) => (
+          <Box
+            key={clip.id}
+            component="img"
+            src={convertFileSrc(overlayAsset.path)}
+            alt={overlayAsset.name}
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              pointerEvents: 'none',
+            }}
+          />
+        ))}
       </Box>
 
       {/* 컨트롤 바 */}
@@ -253,18 +317,17 @@ export function PreviewPlayer() {
         }}
       >
         {/* 시크 슬라이더 */}
-        {canPlay && (
-          <Slider
-            size="small"
-            min={0}
-            max={localDuration || 1}
-            step={0.01}
-            value={displayTime}
-            onChange={handleSliderChange}
-            onChangeCommitted={handleSliderChangeCommitted}
-            sx={{ py: 0.5, color: 'primary.main' }}
-          />
-        )}
+        <Slider
+          size="small"
+          min={0}
+          max={totalDuration}
+          step={0.01}
+          value={isSliderDragging ? localCurrentTime : storeCurrentTime}
+          onChange={handleSliderChange}
+          onChangeCommitted={handleSliderChangeCommitted}
+          sx={{ py: 0.5, color: 'primary.main' }}
+          disabled={!canPlay}
+        />
 
         {/* 재생 컨트롤 + 시간 표시 */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -272,9 +335,10 @@ export function PreviewPlayer() {
             {isPlaying ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
           </IconButton>
           <Typography sx={{ fontSize: 12, color: 'text.secondary', fontFamily: 'monospace' }}>
-            {formatTime(displayTime)} / {formatTime(localDuration)}
+            {formatTime(isSliderDragging ? localCurrentTime : storeCurrentTime)} /{' '}
+            {formatTime(totalDuration)}
           </Typography>
-          {asset && (
+          {activeAsset && (
             <Typography
               variant="caption"
               sx={{
@@ -285,9 +349,9 @@ export function PreviewPlayer() {
                 whiteSpace: 'nowrap',
                 maxWidth: 120,
               }}
-              title={asset.name}
+              title={activeAsset.name}
             >
-              {asset.name}
+              {activeAsset.name}
             </Typography>
           )}
         </Box>
