@@ -92,14 +92,96 @@
 
 ---
 
+## Phase 4-b — 프로젝트 시스템
+
+> 목표: 작업 단위인 "프로젝트"를 도입하여 캔버스 설정·타임라인·에셋 목록을 JSON으로 저장·불러오기
+
+- [x] **데이터 모델** — `ProjectMeta` 타입 정의
+  - 이름, 파일 경로, 캔버스 너비·높이, FPS, 생성일, 수정일
+  - 프리셋: `1080p_16:9 / 4K_16:9 / 1080p_9:16 (세로) / 1:1 (정방형) / 커스텀`
+- [x] **projectStore** — Zustand 프로젝트 상태 관리
+  - `currentProject`, `isDirty` (미저장 변경 여부), `recentProjects`
+  - `createProject(meta)`, `loadProject(path)`, `saveProject()`, `saveProjectAs(path)`
+- [x] **프로젝트 파일 포맷** — `.vedproj` (JSON)
+  - 직렬화 대상: `projectMeta`, `tracks` (Clip 전체), `assetList` (경로·메타)
+  - 경로는 프로젝트 파일 기준 상대 경로로 저장
+- [x] **Tauri 커맨드** — `project_save(path, json)`, `project_load(path) → json`
+  - Rust: `src-tauri/src/commands/project.rs` 신규 작성
+  - `AppError` 반환, `Result<String, AppError>`
+- [x] **새 프로젝트 다이얼로그** — ResizableDialog
+  - 프로젝트 이름 입력, 캔버스 프리셋 선택, 저장 위치 선택
+- [x] **프로젝트 열기** — Tauri `open()` 다이얼로그 (`.vedproj` 필터)
+- [x] **저장 / 다른 이름으로 저장** — Ctrl+S / Ctrl+Shift+S 단축키 연동
+- [ ] **미저장 경고** — `isDirty` 상태 기반 앱 종료·새 프로젝트 시 확인 (ResizableDialog)
+- [x] **최근 프로젝트 목록** — localStorage 최대 10개 히스토리
+- [x] **GlobalAppBar 파일 메뉴** — MUI Menu 드롭다운
+  - 새 프로젝트 / 열기 / 저장 / 다른 이름으로 저장 / 최근 프로젝트 서브메뉴
+- [ ] **캔버스 설정 반영** — projectMeta의 width·height → CANVAS_WIDTH·HEIGHT 동기화
+  - PreviewPlayer `<canvas>` 크기 및 aspect-ratio 연동
+  - timelineStore·canvasCompositor에 전달
+- [x] **타이틀 바 업데이트** — `[프로젝트명][*]` 표시 (미저장 시 `*`)
+
+---
+
+## Phase 4-c — Undo/Redo 히스토리 & 키보드 단축키
+
+> 목표: 모든 편집 액션을 되돌리기·다시 실행 가능한 히스토리 스택으로 관리하고, 핵심 단축키를 전역 등록
+
+### Undo/Redo 히스토리 시스템
+- [ ] **historyStore** — Zustand 기반 히스토리 스토어 (`src/store/historyStore.ts`)
+  - 스냅샷 패턴: 각 편집 액션 전 `timelineStore` 상태 복사본을 스택에 push
+  - `undoStack: TimelineSnapshot[]`, `redoStack: TimelineSnapshot[]`
+  - 최대 스택 깊이: 50개 (초과 시 가장 오래된 항목 제거)
+  - `pushSnapshot(label)` — 현재 타임라인 상태를 스냅샷으로 저장
+  - `undo()` — undoStack에서 pop → timelineStore 상태 복원 → redoStack에 현재 상태 push
+  - `redo()` — redoStack에서 pop → timelineStore 상태 복원 → undoStack에 현재 상태 push
+  - `clearHistory()` — 프로젝트 열기·새 프로젝트 시 히스토리 초기화
+- [ ] **히스토리 연동 액션 래퍼** — `withHistory(label, action)` 유틸리티 함수
+  - `addClip`, `moveClip`, `removeClip`, `splitClip`, `trimClipStart`, `trimClipEnd`
+  - `addTextClip`, `addShapeClip`, `updateClipCanvas`, `updateTrackLayer`, `reorderTracks`
+  - `ripplePushClips` (Magic Wand 삽입)
+- [ ] **Undo/Redo 버튼** — GlobalAppBar에 Undo(↩) / Redo(↪) 아이콘 버튼 추가
+  - `undoStack.length === 0` 이면 Undo 버튼 비활성화
+  - `redoStack.length === 0` 이면 Redo 버튼 비활성화
+  - 툴팁에 마지막 액션 레이블 표시 (예: "실행 취소: 클립 이동")
+- [ ] **히스토리 패널 (선택)** — 우측 PropertiesPanel 내 탭 형태로 히스토리 목록 표시
+  - 액션 이름·아이콘 목록, 클릭으로 특정 지점으로 이동 (고급)
+
+### 키보드 단축키 전역 등록
+- [ ] **useGlobalShortcuts 훅** — `src/lib/useGlobalShortcuts.ts`
+  - `__root.tsx`에서 마운트 (전역 적용)
+  - 단축키 목록:
+    | 단축키 | 동작 |
+    |---|---|
+    | `Ctrl+Z` | Undo |
+    | `Ctrl+Y` / `Ctrl+Shift+Z` | Redo |
+    | `Ctrl+S` | 프로젝트 저장 |
+    | `Ctrl+Shift+S` | 다른 이름으로 저장 |
+    | `Ctrl+N` | 새 프로젝트 |
+    | `Ctrl+O` | 프로젝트 열기 |
+    | `Space` | 재생/일시정지 토글 |
+    | `Delete` / `Backspace` | 선택된 클립 삭제 |
+    | `V` | Select 도구 |
+    | `T` | Text 도구 |
+    | `R` | Rectangle 도구 |
+    | `C` | Circle 도구 |
+    | `A` | Arrow 도구 |
+    | `X` | Crop 도구 |
+    | `S` | Razor 도구 |
+    | `Ctrl+D` | 선택 클립 복제 |
+    | `[` / `]` | 플레이헤드 이전/다음 클립 경계로 이동 |
+    | `,` / `.` | 프레임 단위 이전/다음 이동 |
+
+---
+
 ## Phase 5 — Canvas 기반 합성 프리뷰 (Canvas Compositor)
 
 > 목표: HTML5 Canvas 위에 비디오·이미지·텍스트·도형을 레이어로 합성하여 실시간 프리뷰
 
-- [ ] **데이터 모델** — `Clip`에 캔버스 변환 속성 추가 (`x, y, width, height, rotation, opacity, scaleX, scaleY`)
-- [ ] **데이터 모델** — `Track`에 레이어 속성 추가 (`visible, locked, opacity, zIndex`)
-- [ ] **데이터 모델** — `TextClip` 타입 정의 (text, fontFamily, fontSize, color, bold, italic, align)
-- [ ] **데이터 모델** — `ShapeClip` 타입 정의 (shapeType: rect|circle|arrow, fill, stroke, strokeWidth)
+- [x] **데이터 모델** — `Clip`에 캔버스 변환 속성 추가 (`x, y, width, height, rotation, opacity`)
+- [x] **데이터 모델** — `Track`에 레이어 속성 추가 (`visible, locked, opacity, zIndex`)
+- [x] **데이터 모델** — `TextClip` 타입 정의 (`TextProps`: text, fontFamily, fontSize, color, bold, italic, align, shadow, outline)
+- [x] **데이터 모델** — `ShapeClip` 타입 정의 (`ShapeProps`: shapeType: rect|circle|arrow, fill, stroke, strokeWidth, dash, cornerRadius)
 - [ ] **CanvasCompositor** — PreviewPlayer를 Canvas 기반으로 재설계
   - `<canvas>` 위에 프레임마다 레이어 순서(zIndex)대로 drawImage/fillText/drawShape
   - 비디오 프레임: offscreen `<video>` → `ctx.drawImage(video, x, y, w, h)`
@@ -108,6 +190,15 @@
   - 도형: path-based drawing
 - [ ] **Canvas 선택 인터랙션** — 클릭으로 오브젝트 선택 (hit testing)
 - [ ] **Transform Handles** — 선택된 오브젝트의 8방향 리사이즈 핸들 + 회전 핸들 표시
+- [ ] **에셋 크기 맞춤 모드** — 프로젝트 캔버스 크기와 클립 원본 크기가 다를 때 배치 정책
+  - `fit`    — 비율 유지, 캔버스 안에 맞춤 (레터박스/필러박스)
+  - `fill`   — 비율 유지, 캔버스 꽉 채움 (초과 부분 crop)
+  - `stretch`— 비율 무시, 캔버스 크기에 맞게 늘리기
+  - `center` — 원본 크기 그대로 중앙 배치 (초과 시 클리핑)
+  - `crop`   — 사용자가 직접 `cropRect` 지정 (Crop 도구 연동)
+  - `Clip` 에 `fitMode: 'fit' | 'fill' | 'stretch' | 'center' | 'crop'` 속성 추가
+  - 클립 우클릭 컨텍스트 메뉴 또는 속성 패널에서 변경 가능
+- [ ] **fitMode → FFmpeg Export 연동** — fit/fill/stretch를 `scale` + `pad`/`crop` 필터로 변환
 
 ---
 
@@ -117,6 +208,45 @@
 
 - [x] **toolStore** — 현재 활성 도구 상태 관리 (`select | text | rect | circle | arrow | crop | razor`)
 - [x] **ToolPanel** — 도구 선택 UI (세로 아이콘 툴바, 캔버스 왼쪽 배치)
+- [x] **PropertiesPanel** — 우측 속성 사이드바 컴포넌트 (`src/components/properties/PropertiesPanel.tsx`)
+  - [x] EditorLayout 우측에 배치 (기본 너비 240px, LayoutResizer로 리사이즈)
+  - [x] `useStickyState`로 패널 너비 영구 저장
+  - [ ] 열기/닫기 토글 버튼 (GlobalAppBar 또는 오른쪽 엣지)
+- [x] **PropertiesPanel — 도구별 옵션 패널** — 활성 도구에 따라 동적으로 내용 변경 (기본 UI 구현)
+  - **공통 클립 속성** (Select 도구 + 클립 선택 시)
+    - 위치 `x, y` 수치 입력 (px)
+    - 크기 `width, height` 수치 입력 + 비율 잠금 아이콘
+    - 회전 `rotation` 슬라이더 (-180° ~ 180°) + 수치 입력
+    - 불투명도 `opacity` 슬라이더 (0~100%)
+    - `fitMode` 선택 (fit / fill / stretch / center / crop 라디오 버튼)
+    - 클립 시작 시각 / 지속 시간 수치 표시
+  - **Text 도구 옵션**
+    - 폰트 패밀리 선택 (시스템 폰트 목록)
+    - 폰트 크기 슬라이더 + 수치 입력
+    - 텍스트 색상 (MUI 색상 입력 또는 커스텀 ColorSwatch)
+    - Bold / Italic / Underline 토글 버튼
+    - 정렬 (left / center / right)
+    - 그림자 토글 + 오프셋·블러·색상 세부 설정
+    - 아웃라인 토글 + 두께·색상
+  - **Rect 도구 옵션**
+    - 채우기 색 + 불투명도
+    - 선 색 + 두께 + 대시 패턴
+    - 모서리 반지름 슬라이더
+  - **Circle 도구 옵션**
+    - 채우기 색 + 불투명도
+    - 선 색 + 두께
+  - **Arrow 도구 옵션**
+    - 선 색 + 두께
+    - 화살촉 스타일 (filled / open / none)
+    - 선 스타일 (solid / dashed)
+  - **Crop 도구 옵션**
+    - cropRect 수치 입력 (x, y, w, h)
+    - 비율 잠금 토글
+    - 프리셋 비율 버튼 (16:9 / 9:16 / 1:1 / 4:3 / 자유)
+    - 재설정(Reset) 버튼
+  - **Razor 도구 안내**
+    - 현재 플레이헤드 위치 표시
+    - "클립을 클릭하면 현재 위치에서 분할됩니다" 안내 텍스트
 - [ ] **Select 도구** — Canvas 오브젝트 클릭 선택 + 이동(드래그) + Transform Handles
 - [ ] **Text 도구** — Canvas 클릭 → TextClip 생성 + 인라인 텍스트 에디터 팝업
 - [ ] **Rectangle 도구** — Canvas 드래그로 ShapeClip(rect) 생성
@@ -155,6 +285,17 @@
 
 - [ ] **클립 분할 (Razor)** — 플레이헤드 위치에서 클립을 두 개로 분리 (`splitClip`)
 - [ ] **갭 제거** — 클립 삭제 후 이후 클립들을 앞으로 당기기 (`deleteGap`)
+- [ ] **Timeline Magic Wand (자동 삽입)** — 기준 트랙 위에 다른 클립을 삽입할 때 기준 영상이 자동 조정되는 스마트 삽입 기능
+  - **삽입 모드 선택** — 타임라인 드롭 시 `overlay` vs `insert` 모드 선택 UI (드롭 미니 팝오버)
+  - **insert 모드 동작**:
+    1. 삽입 지점에서 기준 트랙 클립을 `splitClip()`으로 자동 분할
+    2. 삽입 클립 duration만큼 분할된 후반부 클립을 뒤로 이동 (ripple push)
+    3. 삽입 클립을 해당 위치에 배치
+    4. 결과: 기준 영상이 삽입 구간만큼 일시정지 후 삽입 영상 재생 → 다시 기준 영상 재생
+  - **Ripple Push** — 특정 시간 이후의 클립 전체를 지정 delta만큼 일괄 이동 (`ripplePushClips(time, delta)` 액션)
+  - **Magic Wand 버튼** — ToolPanel 또는 타임라인 툴바에 Magic Wand 토글 버튼 추가
+    - 활성화 시 드롭 기본 동작이 insert 모드로 변경
+  - **되돌리기 지원** — undo/redo 스택과 연동 필요
 - [ ] **재생 속도 조절** — 클립 속성에 `playbackRate` 추가 (0.25×~4×)
 - [ ] **페이드 인/아웃** — 클립 시작/끝 불투명도 키프레임 (fade handle)
 - [ ] **비디오 크롭** — displayRect로 보여줄 영역 지정 (클립 내부 뷰포트)
@@ -178,8 +319,8 @@
 - [ ] `asset.rs` — `uuid_v4()` naive 구현 → `uuid` crate로 교체
 - [ ] `.env` 로드 — Rust에서 `dotenv` 또는 빌드 타임 주입 방식 결정
 - [x] `src-tauri/icons/` — 실제 앱 아이콘으로 교체 (클래퍼보드 디자인 생성 완료)
-- [ ] **Canvas 성능** — `requestAnimationFrame` 렌더 루프 최적화, offscreen canvas 활용
-- [ ] **undo/redo** — Zustand immer 미들웨어로 히스토리 스택 구현
-- [ ] **키보드 단축키** — Space(재생), J/K/L(속도), Ctrl+Z(실행 취소), Delete(클립 삭제) 등
-- [ ] **프로젝트 저장/불러오기** — 타임라인 상태 JSON 직렬화 → 파일 저장
+- [x] **Canvas 성능** — Phase 5에서 Canvas Compositor 구현 시 처리
+- [x] **undo/redo** — Phase 4-c로 이관 (상세 항목 참조)
+- [x] **키보드 단축키** — Phase 4-c로 이관 (상세 항목 참조)
+- [x] **프로젝트 저장/불러오기** — Phase 4-b로 이관 (상세 항목 참조)
 - [ ] `.github/prompts/` — `new-route.prompt.md`, `new-command.prompt.md` 내용 검토

@@ -8,4 +8,7 @@ export const STORAGE_KEYS = {
   SETTINGS_THEME_MODE: 'settings:themeMode',
   SETTINGS_DEFAULT_ZOOM: 'settings:defaultZoom',
   SETTINGS_SNAP_INTERVAL: 'settings:snapInterval',
+  // 프로젝트
+  PANEL_PROPERTIES_WIDTH: 'panel:properties:width',
+  RECENT_PROJECTS: 'project:recent',
 } as const

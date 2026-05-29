@@ -10,6 +10,8 @@ pub fn run() {
             commands::asset::asset_probe,
             commands::ffmpeg::ffmpeg_export,
             commands::ffmpeg::generate_thumbnail,
+            commands::project::project_save,
+            commands::project::project_load,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
