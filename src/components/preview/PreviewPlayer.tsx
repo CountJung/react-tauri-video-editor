@@ -48,6 +48,8 @@ export function PreviewPlayer() {
   const duration = useTimelineStore((s) => s.duration)
   const isPlaying = useTimelineStore((s) => s.isPlaying)
   const storeCurrentTime = useTimelineStore((s) => s.currentTime)
+  const canvasWidth = useTimelineStore((s) => s.canvasWidth)
+  const canvasHeight = useTimelineStore((s) => s.canvasHeight)
   const { setPlaying, setCurrentTime } = useTimelineStore()
 
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -254,53 +256,64 @@ export function PreviewPlayer() {
           position: 'relative',
         }}
       >
-        {/* 빈 상태 */}
-        {!activeAsset && activeOverlays.length === 0 && (
-          <Box sx={{ color: 'text.disabled', fontSize: 14 }}>Preview</Box>
-        )}
-
-        {/* 메인 비디오 (항상 렌더, 소스 없으면 숨김) */}
-        {/* biome-ignore lint/a11y/useMediaCaption: 비디오 에디터 프리뷰 */}
-        <video
-          ref={videoRef}
-          style={{
+        {/* 캔버스 비율 유지 컨테이너 */}
+        <Box
+          sx={{
+            aspectRatio: `${canvasWidth} / ${canvasHeight}`,
             maxWidth: '100%',
             maxHeight: '100%',
-            display: activeAsset?.type === 'video' ? 'block' : 'none',
+            position: 'relative',
+            overflow: 'hidden',
           }}
-          onTimeUpdate={handleVideoTimeUpdate}
-          onLoadedMetadata={handleVideoLoadedMetadata}
-          onEnded={handleVideoEnded}
-        />
+        >
+          {/* 빈 상태 */}
+          {!activeAsset && activeOverlays.length === 0 && (
+            <Box sx={{ color: 'text.disabled', fontSize: 14 }}>Preview</Box>
+          )}
 
-        {/* 이미지 클립 (비디오 트랙에 배치된 이미지) */}
-        {activeAsset?.type === 'image' && (
-          <Box
-            component="img"
-            src={convertFileSrc(activeAsset.path)}
-            alt={activeAsset.name}
-            sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-          />
-        )}
-
-        {/* 오버레이 이미지 (overlay 트랙 클립 — 비디오 위에 겹침) */}
-        {activeOverlays.map(({ clip, asset: overlayAsset }) => (
-          <Box
-            key={clip.id}
-            component="img"
-            src={convertFileSrc(overlayAsset.path)}
-            alt={overlayAsset.name}
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              pointerEvents: 'none',
+          {/* 메인 비디오 (항상 렌더, 소스 없으면 숨김) */}
+          {/* biome-ignore lint/a11y/useMediaCaption: 비디오 에디터 프리뷰 */}
+          <video
+            ref={videoRef}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              display: activeAsset?.type === 'video' ? 'block' : 'none',
             }}
+            onTimeUpdate={handleVideoTimeUpdate}
+            onLoadedMetadata={handleVideoLoadedMetadata}
+            onEnded={handleVideoEnded}
           />
-        ))}
+
+          {/* 이미지 클립 (비디오 트랙에 배치된 이미지) */}
+          {activeAsset?.type === 'image' && (
+            <Box
+              component="img"
+              src={convertFileSrc(activeAsset.path)}
+              alt={activeAsset.name}
+              sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            />
+          )}
+
+          {/* 오버레이 이미지 (overlay 트랙 클립 — 비디오 위에 겹침) */}
+          {activeOverlays.map(({ clip, asset: overlayAsset }) => (
+            <Box
+              key={clip.id}
+              component="img"
+              src={convertFileSrc(overlayAsset.path)}
+              alt={overlayAsset.name}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                pointerEvents: 'none',
+              }}
+            />
+          ))}
+        </Box>
       </Box>
 
       {/* 컨트롤 바 */}

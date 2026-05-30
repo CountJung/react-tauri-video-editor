@@ -120,16 +120,20 @@ function calcDuration(tracks: Track[]): number {
 }
 
 /** 미디어 클립의 기본 Canvas 크기: 에셋 해상도 → 캔버스 전체 채우기 */
-function defaultClipSize(asset: Asset): { x: number; y: number; width: number; height: number } {
+function defaultClipSize(
+  asset: Asset,
+  canvasW: number,
+  canvasH: number
+): { x: number; y: number; width: number; height: number } {
   if (asset.type === 'audio') return { x: 0, y: 0, width: 0, height: 0 }
-  const w = asset.width || CANVAS_WIDTH
-  const h = asset.height || CANVAS_HEIGHT
+  const w = asset.width || canvasW
+  const h = asset.height || canvasH
   // 캔버스에 맞게 letterbox fit
-  const scale = Math.min(CANVAS_WIDTH / w, CANVAS_HEIGHT / h)
+  const scale = Math.min(canvasW / w, canvasH / h)
   const width = Math.round(w * scale)
   const height = Math.round(h * scale)
-  const x = Math.round((CANVAS_WIDTH - width) / 2)
-  const y = Math.round((CANVAS_HEIGHT - height) / 2)
+  const x = Math.round((canvasW - width) / 2)
+  const y = Math.round((canvasH - height) / 2)
   return { x, y, width, height }
 }
 
@@ -157,6 +161,10 @@ interface TimelineState {
   snapInterval: number
   isPlaying: boolean
   selectedClipId: string | null
+  /** 프로젝트 캔버스 출력 해상도 너비 */
+  canvasWidth: number
+  /** 프로젝트 캔버스 출력 해상도 높이 */
+  canvasHeight: number
 }
 
 export type ClipCanvasUpdate = Partial<
@@ -202,6 +210,9 @@ interface TimelineActions {
   // Canvas 변환
   updateClipCanvas: (clipId: string, update: ClipCanvasUpdate) => void
   selectClip: (clipId: string | null) => void
+
+  // 캔버스
+  setCanvasDimensions: (width: number, height: number) => void
 
   // 재생
   setCurrentTime: (time: number) => void
@@ -280,6 +291,8 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
   ),
   isPlaying: false,
   selectedClipId: null,
+  canvasWidth: CANVAS_WIDTH,
+  canvasHeight: CANVAS_HEIGHT,
 
   // ── 트랙 관리 ────────────────────────────────────────────────────────────
 
@@ -313,7 +326,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
     set((state) => {
       const snap = snapToGrid(Math.max(0, startSec), state.snapInterval)
       const dur = asset.duration || 5
-      const size = defaultClipSize(asset)
+      const size = defaultClipSize(asset, state.canvasWidth, state.canvasHeight)
       const clip: Clip = {
         id: crypto.randomUUID(),
         assetId: asset.id,
@@ -428,9 +441,9 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         trimStart: 0,
         trimEnd: duration,
         clipType: 'text',
-        x: CANVAS_WIDTH / 4,
-        y: CANVAS_HEIGHT - 200,
-        width: CANVAS_WIDTH / 2,
+        x: state.canvasWidth / 4,
+        y: state.canvasHeight - 200,
+        width: state.canvasWidth / 2,
         height: 120,
         rotation: 0,
         opacity: 1,
@@ -480,6 +493,8 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
   selectClip: (clipId) => set({ selectedClipId: clipId }),
 
   // ── 재생 ─────────────────────────────────────────────────────────────────
+
+  setCanvasDimensions: (width, height) => set({ canvasWidth: width, canvasHeight: height }),
 
   setCurrentTime: (time) => set({ currentTime: Math.max(0, time) }),
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),

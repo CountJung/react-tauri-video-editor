@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/storageKeys'
 import { useStickyState } from '@/lib/useStickyState'
+import { withHistory } from '@/lib/withHistory'
 import { useAssetStore } from '@/store/assetStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import {
@@ -73,14 +74,16 @@ export function EditorLayout() {
       // getBoundingClientRect 기반이므로 scrollLeft는 별도 보정 불필요
       const translated = active.rect.current.translated
       const dropX = translated != null ? translated.left - over.rect.left : 0
-      addClip(overData.trackId, asset, Math.max(0, dropX / zoom))
+      withHistory('클립 추가', () => addClip(overData.trackId, asset, Math.max(0, dropX / zoom)))
     }
 
     // 클립 이동 (delta.x / zoom = 이동한 초)
     if (activeData?.type === 'clip') {
       const { clipId, originalStart } = activeData
       const { zoom } = useTimelineStore.getState()
-      moveClip(clipId, Math.max(0, originalStart + event.delta.x / zoom))
+      withHistory('클립 이동', () =>
+        moveClip(clipId, Math.max(0, originalStart + event.delta.x / zoom))
+      )
     }
   }
 

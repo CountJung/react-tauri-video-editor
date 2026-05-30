@@ -1,4 +1,5 @@
 import { useAssetStore } from '@/store/assetStore'
+import { useHistoryStore } from '@/store/historyStore'
 import type { Clip, Track } from '@/store/timelineStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
@@ -77,6 +78,10 @@ function TrimHandle({ side, clip, zoom }: TrimHandleProps) {
       const startX = e.clientX
       const startTrimStart = clip.trimStart
       const startTrimEnd = clip.trimEnd
+      const label = side === 'start' ? '클립 앞부분 트림' : '클립 뒷부분 트림'
+
+      // 트림 시작 전 스냅샷 저장
+      useHistoryStore.getState().pushSnapshot(label)
 
       document.body.style.cursor = 'ew-resize'
       document.body.style.userSelect = 'none'

@@ -35,10 +35,13 @@ function getRustTriple() {
 }
 
 // ── Rust triple → ffbinaries 플랫폼 키 ─────────────────────────────────────
+// ffbinaries.com은 macOS ARM64(osx-arm-64) 빌드를 제공하지 않습니다.
+// Apple Silicon(aarch64)은 Rosetta 2를 통해 x86_64(osx-64) 바이너리를 실행합니다.
 function getFfbinariesPlatform(triple) {
   if (triple.includes('windows')) return 'windows-64'
-  if (triple.includes('apple') && triple.includes('aarch64')) return 'osx-arm-64'
   if (triple.includes('apple')) return 'osx-64'
+  if (triple.includes('linux') && triple.includes('aarch64')) return 'linux-arm64'
+  if (triple.includes('linux') && triple.includes('armv7')) return 'linux-armhf'
   if (triple.includes('linux')) return 'linux-64'
   throw new Error(`지원하지 않는 플랫폼: ${triple}`)
 }

@@ -1,0 +1,35 @@
+   0.157970500s  INFO prepare_target{force=false package_id=react-tauri-video-editor v0.1.0 (/Volumes/Crucial X6/MacWorking/react-tauri-video-editor/src-tauri) target="react_tauri_video_editor_lib"}: cargo::core::compiler::fingerprint: fingerprint error for react-tauri-video-editor v0.1.0 (/Volumes/Crucial X6/MacWorking/react-tauri-video-editor/src-tauri)/Check { test: false }/TargetInner { ..: lib_target("react_tauri_video_editor_lib", ["staticlib", "cdylib", "rlib"], "/Volumes/Crucial X6/MacWorking/react-tauri-video-editor/src-tauri/src/lib.rs", Edition2021) }
+   0.158255084s  INFO prepare_target{force=false package_id=react-tauri-video-editor v0.1.0 (/Volumes/Crucial X6/MacWorking/react-tauri-video-editor/src-tauri) target="react_tauri_video_editor_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Volumes/Crucial X6/MacWorking/react-tauri-video-editor/{env:HOME}/.cache/react-tauri-video-editor-target/rust-analyzer/debug/.fingerprint/react-tauri-video-editor-819bb31a4236976e/lib-react_tauri_video_editor_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: <std::backtrace::Backtrace>::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+error: failed to join paths from `$DYLD_FALLBACK_LIBRARY_PATH` together
+
+Check if any of path segments listed below contain an unterminated quote character or path separator:
+    "/Volumes/Crucial X6/MacWorking/react-tauri-video-editor/{env:HOME}/.cache/react-tauri-video-editor-target/rust-analyzer/debug/deps"
+    "/Users/jsjmac/.rustup/toolchains/stable-aarch64-apple-darwin/lib"
+    "/Users/jsjmac/lib"
+    "/usr/local/lib"
+    "/usr/lib"
+
+Caused by:
+  path segment contains separator `:`

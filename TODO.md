@@ -112,11 +112,11 @@
   - 프로젝트 이름 입력, 캔버스 프리셋 선택, 저장 위치 선택
 - [x] **프로젝트 열기** — Tauri `open()` 다이얼로그 (`.vedproj` 필터)
 - [x] **저장 / 다른 이름으로 저장** — Ctrl+S / Ctrl+Shift+S 단축키 연동
-- [ ] **미저장 경고** — `isDirty` 상태 기반 앱 종료·새 프로젝트 시 확인 (ResizableDialog)
+- [x] **미저장 경고** — `isDirty` 상태 기반 앱 종료·새 프로젝트 시 확인 (ResizableDialog)
 - [x] **최근 프로젝트 목록** — localStorage 최대 10개 히스토리
 - [x] **GlobalAppBar 파일 메뉴** — MUI Menu 드롭다운
   - 새 프로젝트 / 열기 / 저장 / 다른 이름으로 저장 / 최근 프로젝트 서브메뉴
-- [ ] **캔버스 설정 반영** — projectMeta의 width·height → CANVAS_WIDTH·HEIGHT 동기화
+- [x] **캔버스 설정 반영** — projectMeta의 width·height → CANVAS_WIDTH·HEIGHT 동기화
   - PreviewPlayer `<canvas>` 크기 및 aspect-ratio 연동
   - timelineStore·canvasCompositor에 전달
 - [x] **타이틀 바 업데이트** — `[프로젝트명][*]` 표시 (미저장 시 `*`)
@@ -128,7 +128,7 @@
 > 목표: 모든 편집 액션을 되돌리기·다시 실행 가능한 히스토리 스택으로 관리하고, 핵심 단축키를 전역 등록
 
 ### Undo/Redo 히스토리 시스템
-- [ ] **historyStore** — Zustand 기반 히스토리 스토어 (`src/store/historyStore.ts`)
+- [x] **historyStore** — Zustand 기반 히스토리 스토어 (`src/store/historyStore.ts`)
   - 스냅샷 패턴: 각 편집 액션 전 `timelineStore` 상태 복사본을 스택에 push
   - `undoStack: TimelineSnapshot[]`, `redoStack: TimelineSnapshot[]`
   - 최대 스택 깊이: 50개 (초과 시 가장 오래된 항목 제거)
@@ -136,11 +136,11 @@
   - `undo()` — undoStack에서 pop → timelineStore 상태 복원 → redoStack에 현재 상태 push
   - `redo()` — redoStack에서 pop → timelineStore 상태 복원 → undoStack에 현재 상태 push
   - `clearHistory()` — 프로젝트 열기·새 프로젝트 시 히스토리 초기화
-- [ ] **히스토리 연동 액션 래퍼** — `withHistory(label, action)` 유틸리티 함수
+- [x] **히스토리 연동 액션 래퍼** — `withHistory(label, action)` 유틸리티 함수
   - `addClip`, `moveClip`, `removeClip`, `splitClip`, `trimClipStart`, `trimClipEnd`
   - `addTextClip`, `addShapeClip`, `updateClipCanvas`, `updateTrackLayer`, `reorderTracks`
   - `ripplePushClips` (Magic Wand 삽입)
-- [ ] **Undo/Redo 버튼** — GlobalAppBar에 Undo(↩) / Redo(↪) 아이콘 버튼 추가
+- [x] **Undo/Redo 버튼** — GlobalAppBar에 Undo(↩) / Redo(↪) 아이콘 버튼 추가
   - `undoStack.length === 0` 이면 Undo 버튼 비활성화
   - `redoStack.length === 0` 이면 Redo 버튼 비활성화
   - 툴팁에 마지막 액션 레이블 표시 (예: "실행 취소: 클립 이동")
@@ -148,7 +148,7 @@
   - 액션 이름·아이콘 목록, 클릭으로 특정 지점으로 이동 (고급)
 
 ### 키보드 단축키 전역 등록
-- [ ] **useGlobalShortcuts 훅** — `src/lib/useGlobalShortcuts.ts`
+- [x] **useGlobalShortcuts 훅** — `src/lib/useGlobalShortcuts.ts`
   - `__root.tsx`에서 마운트 (전역 적용)
   - 단축키 목록:
     | 단축키 | 동작 |

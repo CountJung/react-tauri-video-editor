@@ -1,6 +1,7 @@
 import { tauriInvoke } from '@/lib/invoke'
 import { STORAGE_KEYS } from '@/lib/storageKeys'
 import { create } from 'zustand'
+import { useTimelineStore } from './timelineStore'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 데이터 모델
@@ -148,6 +149,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
       height: presetId === 'custom' && customH ? customH : presetDef.height,
     })
     set({ currentProject: meta, isDirty: false })
+    useTimelineStore.getState().setCanvasDimensions(meta.canvasWidth, meta.canvasHeight)
     return meta
   },
 
@@ -157,6 +159,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
     const recent = addToRecent(get().recentProjects, meta)
     saveRecentToStorage(recent)
     set({ currentProject: meta, isDirty: false, recentProjects: recent })
+    useTimelineStore.getState().setCanvasDimensions(meta.canvasWidth, meta.canvasHeight)
     return meta
   },
 

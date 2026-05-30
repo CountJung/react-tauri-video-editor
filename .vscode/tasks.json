@@ -28,6 +28,11 @@
       "type": "shell",
       "command": "pnpm dev",
       "isBackground": true,
+      "options": {
+        "env": {
+          "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
+        }
+      },
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -39,7 +44,10 @@
       "type": "shell",
       "command": "cargo check",
       "options": {
-        "cwd": "${workspaceFolder}/src-tauri"
+        "cwd": "${workspaceFolder}/src-tauri",
+        "env": {
+          "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
+        }
       },
       "group": {
         "kind": "build",
@@ -56,7 +64,10 @@
       "type": "shell",
       "command": "cargo clippy -- -D warnings",
       "options": {
-        "cwd": "${workspaceFolder}/src-tauri"
+        "cwd": "${workspaceFolder}/src-tauri",
+        "env": {
+          "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
+        }
       },
       "group": "build",
       "problemMatcher": "$rustc",

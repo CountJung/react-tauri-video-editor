@@ -1,0 +1,34 @@
+{
+  // ── macOS 전용 터미널 환경 ────────────────────────────────────────────────
+  // - Homebrew, Cargo를 PATH에 추가 (VS Code GUI 기동 시 login shell 미로드 대응)
+  // - CARGO_TARGET_DIR: 외장 하드 ._* 메타파일 패닉 방지 (내부 드라이브로 리다이렉트)
+  "terminal.integrated.env.osx": {
+    "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:${env:HOME}/.cargo/bin:${env:PATH}",
+    "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
+  },
+
+  // ── Windows 전용 터미널 환경 ─────────────────────────────────────────────
+  // - CARGO_TARGET_DIR: 외장 드라이브 사용 시 빌드 속도 향상 (선택)
+  "terminal.integrated.env.windows": {
+    "CARGO_TARGET_DIR": "${env:USERPROFILE}\\.cache\\react-tauri-video-editor-target"
+  },
+
+  // ── rust-analyzer: 별도 캐시 디렉터리 사용 ──────────────────────────────
+  // targetDir: true → rust-analyzer가 직접 관리하는 내부 드라이브 캐시 사용
+  // exFAT 외장 드라이브의 ._*.toml 메타파일 생성을 차단합니다.
+  "rust-analyzer.cargo.targetDir": true,
+
+  // ── 외장 드라이브 ._* 파일 탐색기에서 숨기기 (macOS) ─────────────────────
+  "files.exclude": {
+    "**/.DS_Store": true,
+    "**/._*": true,
+    "**/.Spotlight-V100": true,
+    "**/.Trashes": true,
+    "**/.fseventsd": true
+  },
+  "search.exclude": {
+    "**/._*": true,
+    "src-tauri/target": true,
+    "**/node_modules": true
+  }
+}

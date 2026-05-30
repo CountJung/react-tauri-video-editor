@@ -1,10 +1,12 @@
 {
   "version": "0.2.0",
   "configurations": [
+    // ── macOS — CodeLLDB ─────────────────────────────────────────────────────
+    // 필요 확장: vadimcn.vscode-lldb
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug Tauri App (Rust + Frontend)",
+      "name": "Debug Tauri App (macOS)",
       "cargo": {
         "args": [
           "build",
@@ -14,6 +16,39 @@
         "filter": {
           "name": "react-tauri-video-editor",
           "kind": "bin"
+        },
+        "env": {
+          "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_BACKTRACE": "1",
+        "RUST_LOG": "debug",
+        "WEBKIT_DISABLE_COMPOSITING_MODE": "1"
+      },
+      "preLaunchTask": "start-vite-dev-server"
+    },
+
+    // ── Windows — CodeLLDB ───────────────────────────────────────────────────
+    // 필요 확장: vadimcn.vscode-lldb
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Tauri App (Windows)",
+      "cargo": {
+        "args": [
+          "build",
+          "--manifest-path=./src-tauri/Cargo.toml",
+          "--no-default-features"
+        ],
+        "filter": {
+          "name": "react-tauri-video-editor",
+          "kind": "bin"
+        },
+        "env": {
+          "CARGO_TARGET_DIR": "${env:USERPROFILE}\\.cache\\react-tauri-video-editor-target"
         }
       },
       "args": [],
@@ -24,6 +59,8 @@
       },
       "preLaunchTask": "start-vite-dev-server"
     },
+
+    // ── 프론트엔드 전용 (공통) ────────────────────────────────────────────────
     {
       "type": "chrome",
       "request": "launch",

@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    // Rust 디버거 (macOS + Windows + Linux 공통)
+    "vadimcn.vscode-lldb",
+    // Rust 언어 지원
+    "rust-lang.rust-analyzer",
+    // Biome (TS/JS 린터·포매터)
+    "biomejs.biome",
+    // Tauri 개발 (스니펫, 명령 팔레트)
+    "tauri-apps.tauri-vscode"
+  ]
+}
