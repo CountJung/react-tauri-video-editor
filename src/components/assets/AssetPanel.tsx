@@ -6,9 +6,11 @@ import AddIcon from '@mui/icons-material/Add'
 import AudiotrackIcon from '@mui/icons-material/Audiotrack'
 import ImageIcon from '@mui/icons-material/Image'
 import VideocamIcon from '@mui/icons-material/Videocam'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
 import IconButton from '@mui/material/IconButton'
+import Snackbar from '@mui/material/Snackbar'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { appLocalDataDir, join } from '@tauri-apps/api/path'
@@ -23,6 +25,32 @@ interface AssetMeta {
   duration: number
   width?: number
   height?: number
+}
+
+interface AppErrorLike {
+  code?: string
+  message?: string
+}
+
+function isDialogCanceled(error: unknown): boolean {
+  if (typeof error === 'string') return /cancel/i.test(error)
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: string }).message
+    return typeof message === 'string' && /cancel/i.test(message)
+  }
+  return false
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object') {
+    const appError = error as AppErrorLike
+    if (typeof appError.message === 'string' && appError.message.length > 0) {
+      return appError.code ? `[${appError.code}] ${appError.message}` : appError.message
+    }
+  }
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error.length > 0) return error
+  return fallback
 }
 
 function formatDuration(sec: number): string {
@@ -130,8 +158,13 @@ function DraggableAssetItem({
 export function AssetPanel() {
   const [isDragging, setIsDragging] = useState(false)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { assets, addAsset, updateAsset, updateThumbnail, selectedAssetId, setSelectedAsset } =
     useAssetStore()
+
+  const showError = useCallback((message: string) => {
+    setErrorMessage(message)
+  }, [])
 
   const handleFilePaths = useCallback(
     async (paths: string[]) => {
@@ -140,7 +173,10 @@ export function AssetPanel() {
         let basicMeta: AssetMeta
         try {
           basicMeta = await tauriInvoke<AssetMeta>('asset_import', { path: filePath })
-        } catch {
+        } catch (error) {
+          const reason = toErrorMessage(error, '파일을 추가하지 못했습니다.')
+          console.error('[AssetPanel] asset_import failed:', { filePath, error })
+          showError(`파일 추가 실패: ${reason}`)
           continue
         }
 
@@ -180,7 +216,8 @@ export function AssetPanel() {
                 // 썸네일 생성 실패 시 무시 (FFmpeg 미설치 환경)
               }
             }
-          } catch {
+          } catch (error) {
+            console.warn('[AssetPanel] asset_probe failed, keep basic metadata:', { filePath, error })
             // ffprobe 실패 시 기본 메타 유지
           } finally {
             setLoadingIds((prev) => {
@@ -192,7 +229,7 @@ export function AssetPanel() {
         })()
       }
     },
-    [addAsset, updateAsset, updateThumbnail]
+    [addAsset, showError, updateAsset, updateThumbnail]
   )
 
   // Tauri 전역 파일 드롭 이벤트 등록
@@ -263,6 +300,12 @@ export function AssetPanel() {
               'flac',
               'ogg',
               'm4a',
+              'png',
+              'jpg',
+              'jpeg',
+              'gif',
+              'webp',
+              'bmp',
             ],
           },
         ],
@@ -270,8 +313,11 @@ export function AssetPanel() {
       if (!result) return
       const paths = Array.isArray(result) ? result : [result]
       handleFilePaths(paths)
-    } catch {
-      // 다이얼로그 취소 시 무시
+    } catch (error) {
+      if (isDialogCanceled(error)) return
+      const reason = toErrorMessage(error, '파일 선택 창을 열지 못했습니다.')
+      console.error('[AssetPanel] open dialog failed:', error)
+      showError(`파일 선택 실패: ${reason}`)
     }
   }
 
@@ -339,6 +385,17 @@ export function AssetPanel() {
           ))}
         </Box>
       )}
+
+      <Snackbar
+        open={Boolean(errorMessage)}
+        autoHideDuration={4200}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert severity="error" variant="filled" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }

@@ -13,10 +13,20 @@
     "CARGO_TARGET_DIR": "${env:USERPROFILE}\\.cache\\react-tauri-video-editor-target"
   },
 
-  // ── rust-analyzer: 별도 캐시 디렉터리 사용 ──────────────────────────────
-  // targetDir: true → rust-analyzer가 직접 관리하는 내부 드라이브 캐시 사용
-  // exFAT 외장 드라이브의 ._*.toml 메타파일 생성을 차단합니다.
-  "rust-analyzer.cargo.targetDir": true,
+  // ── rust-analyzer: Cargo target 경로 강제 ──────────────────────────────
+  // cargo.targetDir=true 는 워크스페이스의 target/rust-analyzer 하위에 생성되므로
+  // exFAT 환경에서는 ._*.toml 메타파일이 다시 생길 수 있습니다.
+  // server/cargo/check 모든 경로에 CARGO_TARGET_DIR를 주입해 내부 드라이브 캐시를 강제합니다.
+  // rust-analyzer extraEnv는 ${env:HOME} 치환을 기대하지 말고 실제 절대 경로를 사용합니다.
+  "rust-analyzer.server.extraEnv": {
+    "CARGO_TARGET_DIR": "/Users/jsjmac/.cache/react-tauri-video-editor-target/rust-analyzer"
+  },
+  "rust-analyzer.cargo.extraEnv": {
+    "CARGO_TARGET_DIR": "/Users/jsjmac/.cache/react-tauri-video-editor-target/rust-analyzer"
+  },
+  "rust-analyzer.check.extraEnv": {
+    "CARGO_TARGET_DIR": "/Users/jsjmac/.cache/react-tauri-video-editor-target/rust-analyzer"
+  },
 
   // ── 외장 드라이브 ._* 파일 탐색기에서 숨기기 (macOS) ─────────────────────
   "files.exclude": {

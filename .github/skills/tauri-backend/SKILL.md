@@ -192,3 +192,32 @@ pub const EVENT_THUMBNAIL_READY: &str = "thumbnail-ready";
 # .env
 APP_TEMP_DIR=.video-editor-temp
 ```
+
+---
+
+## macOS 외장하드 디버깅 주의사항
+
+외장 exFAT 볼륨에서 Tauri/Rust를 디버깅할 때는 빌드 산출물이 워크스페이스 내부 `src-tauri/target`에 남지 않도록 반드시 분리한다.
+
+### 왜 필요한가
+
+- macOS는 exFAT에 `._*` 메타데이터 파일을 생성한다.
+- Tauri `build.rs`가 생성된 permissions 파일을 읽을 때 `._default.toml` 같은 메타파일을 만나면 UTF-8 패닉이 발생할 수 있다.
+- CodeLLDB의 `cargo` 실행은 `launch.json`의 일반 `env`가 아니라 `cargo.env`를 사용해야 한다.
+- rust-analyzer는 `terminal.integrated.env.*`를 따르지 않으므로 별도 `extraEnv`가 필요하다.
+
+### 반드시 지킬 설정 규칙
+
+1. CodeLLDB 사용 시 `launch.json`의 `cargo.env.CARGO_TARGET_DIR`로 내부 드라이브 캐시를 지정한다.
+2. rust-analyzer 사용 시 `rust-analyzer.server.extraEnv`, `rust-analyzer.cargo.extraEnv`, `rust-analyzer.check.extraEnv`에 동일한 `CARGO_TARGET_DIR`를 지정한다.
+3. rust-analyzer 설정에서는 `${env:HOME}` 같은 변수 치환을 기대하지 말고 실제 절대 경로를 넣는다. 치환이 안 되면 `src-tauri/${env:HOME}/...` 같은 잘못된 캐시 경로가 생긴다.
+4. `rust-analyzer.cargo.targetDir = true`는 워크스페이스 아래 `target/rust-analyzer`를 다시 만들 수 있으므로 외장 exFAT에서는 사용하지 않는다.
+5. 외장 드라이브의 기존 `src-tauri/target/`은 필요 시 삭제하고, `dot_clean`으로 `._*` 메타파일을 정리한다.
+6. 디버그 실패 시 먼저 `src-tauri/target/` 내부에 `._default.toml` 또는 `._*` 파일이 있는지 확인한다.
+
+### 권장 체크 포인트
+
+- Debug 실행 전 `cargo check`가 내부 드라이브 캐시를 사용하고 있는지 확인한다.
+- `src-tauri/target/`이 외장하드에 다시 생기면 즉시 설정을 점검한다.
+- Tauri 창 닫기/저장 다이얼로그 오류와 별개로, 빌드 단계에서의 패닉인지 런타임 오류인지 먼저 구분한다.
+- rust-analyzer가 만든 캐시가 보이면, 먼저 설정 문자열에 리터럴 `${env:...}`가 섞여 있지 않은지 확인한다.
