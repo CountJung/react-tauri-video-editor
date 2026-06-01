@@ -33,6 +33,8 @@
 
     // ── Windows — CodeLLDB ───────────────────────────────────────────────────
     // 필요 확장: vadimcn.vscode-lldb
+    // 필요 조건: winget install Microsoft.VisualStudioBuildTools  (MSVC 링커)
+    //           rustup target add x86_64-pc-windows-msvc
     {
       "type": "lldb",
       "request": "launch",

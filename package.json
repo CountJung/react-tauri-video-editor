@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "setup:windows": "node scripts/setup-windows.mjs",
     "install-ffmpeg": "node scripts/download-ffmpeg.mjs",
     "dev": "tauri dev",
     "dev:vite": "vite",

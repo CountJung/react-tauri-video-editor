@@ -1,0 +1,53 @@
+# ── 줄 끝 정책 ─────────────────────────────────────────────────────────────────
+# cross-platform (macOS ↔ Windows) 개발 시 CRLF/LF 충돌 방지.
+# Windows checkout 시 CRLF 자동 변환 허용, commit 시 LF 정규화.
+
+# 기본값: 텍스트 파일 → LF (commit 기준), checkout 시 OS 줄 끝 적용
+* text=auto
+
+# ── 소스 코드 ─ LF 강제 (cargo 빌드 오류 방지) ──────────────────────────────
+*.rs    text eol=lf
+*.toml  text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.jsonc text eol=lf
+*.md    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.env   text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+
+# ── 설정 파일 ─ LF 강제 ──────────────────────────────────────────────────────
+.gitignore   text eol=lf
+.gitattributes text eol=lf
+Cargo.lock   text eol=lf
+pnpm-lock.yaml text eol=lf
+
+# ── 쉘 스크립트 ─ LF 강제 (Windows 실행 가능하도록 eol=lf 유지) ─────────────
+*.sh    text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+
+# ── 바이너리 파일 ─ 줄 끝 변환 제외 ──────────────────────────────────────────
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.bmp   binary
+*.ico   binary
+*.icns  binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+*.a     binary
+*.lib   binary
+*.zip   binary
+*.tar   binary
+*.gz    binary
+*.wasm  binary

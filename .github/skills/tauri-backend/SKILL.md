@@ -221,3 +221,63 @@ APP_TEMP_DIR=.video-editor-temp
 - `src-tauri/target/`이 외장하드에 다시 생기면 즉시 설정을 점검한다.
 - Tauri 창 닫기/저장 다이얼로그 오류와 별개로, 빌드 단계에서의 패닉인지 런타임 오류인지 먼저 구분한다.
 - rust-analyzer가 만든 캐시가 보이면, 먼저 설정 문자열에 리터럴 `${env:...}`가 섞여 있지 않은지 확인한다.
+
+---
+
+## Windows 개발 환경 설정
+
+Windows에서 `git pull` 후 바로 개발을 시작하기 위해 반드시 수행해야 할 설정이다.
+
+### Windows git pull 경로 오류 원인
+
+- rust-analyzer의 `extraEnv`가 `${env:HOME}` 변수 치환을 지원하지 않아 `src-tauri/${env:HOME}/...` 같은 리터럴 경로가 실수로 생성될 수 있다.
+- 이 경로의 `$`, `{`, `:` 문자는 Windows NTFS에서 파일명으로 사용 불가 → `git pull` 실패.
+- **해결**: 해당 디렉터리가 git에 추적되지 않도록 `.gitignore`에 패턴 추가. 리터럴 경로 디렉터리는 `rm -rf 'src-tauri/${env:HOME}'`으로 삭제.
+
+### Windows 초기 설정 절차
+
+```powershell
+# 1. 의존성 설치
+pnpm install
+
+# 2. Windows 전용 초기화 스크립트 실행 (도구 확인, 캐시 디렉터리 생성, settings.json 경로 수정)
+node scripts/setup-windows.mjs
+
+# 3. FFmpeg 바이너리 다운로드
+pnpm install-ffmpeg
+
+# 4. Rust Windows 타겟 등록 (setup-windows.mjs에서 자동 처리)
+rustup target add x86_64-pc-windows-msvc
+
+# 5. MSVC 링커 설치 (winget으로)
+winget install Microsoft.VisualStudioBuildTools
+# → 설치 후 "Desktop development with C++" 워크로드 선택
+```
+
+### rust-analyzer 경로 수정 (반드시 수행)
+
+`.vscode/settings.json`에 있는 `rust-analyzer.*.extraEnv`의 `CARGO_TARGET_DIR`은 macOS 절대 경로로 하드코딩되어 있다.  
+Windows에서는 다음 경로로 직접 변경해야 한다:
+
+```json
+"rust-analyzer.server.extraEnv": {
+  "CARGO_TARGET_DIR": "C:\\Users\\<USERNAME>\\.cache\\react-tauri-video-editor-target\\rust-analyzer"
+},
+"rust-analyzer.cargo.extraEnv": {
+  "CARGO_TARGET_DIR": "C:\\Users\\<USERNAME>\\.cache\\react-tauri-video-editor-target\\rust-analyzer"
+},
+"rust-analyzer.check.extraEnv": {
+  "CARGO_TARGET_DIR": "C:\\Users\\<USERNAME>\\.cache\\react-tauri-video-editor-target\\rust-analyzer"
+}
+```
+
+또는 `node scripts/setup-windows.mjs`를 Windows에서 실행하면 자동으로 치환된다.
+
+> **핵심 주의**: `${env:USERPROFILE}` 같은 VS Code 변수는 `terminal.integrated.env.*`에서는 동작하지만  
+> `rust-analyzer.*.extraEnv`에서는 **절대 치환되지 않는다** — 리터럴 문자열로 경로를 지정해야 한다.
+
+### Windows 디버깅 설정 확인
+
+`launch.json`에 이미 Windows 디버그 설정이 포함되어 있다:
+- VS Code에서 F5 → "Debug Tauri App (Windows)" 선택
+- CARGO_TARGET_DIR이 `%USERPROFILE%\.cache\...`로 설정되어 있으므로 내부 드라이브에 빌드됨
