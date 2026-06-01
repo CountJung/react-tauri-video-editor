@@ -33,6 +33,13 @@
           "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
         }
       },
+      "windows": {
+        "options": {
+          "env": {
+            "CARGO_TARGET_DIR": "${env:USERPROFILE}\\.cache\\react-tauri-video-editor-target"
+          }
+        }
+      },
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -47,6 +54,14 @@
         "cwd": "${workspaceFolder}/src-tauri",
         "env": {
           "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
+        }
+      },
+      "windows": {
+        "options": {
+          "cwd": "${workspaceFolder}/src-tauri",
+          "env": {
+            "CARGO_TARGET_DIR": "${env:USERPROFILE}\\.cache\\react-tauri-video-editor-target"
+          }
         }
       },
       "group": {
@@ -67,6 +82,14 @@
         "cwd": "${workspaceFolder}/src-tauri",
         "env": {
           "CARGO_TARGET_DIR": "${env:HOME}/.cache/react-tauri-video-editor-target"
+        }
+      },
+      "windows": {
+        "options": {
+          "cwd": "${workspaceFolder}/src-tauri",
+          "env": {
+            "CARGO_TARGET_DIR": "${env:USERPROFILE}\\.cache\\react-tauri-video-editor-target"
+          }
         }
       },
       "group": "build",

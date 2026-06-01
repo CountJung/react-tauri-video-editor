@@ -27,6 +27,7 @@
 - [x] `pnpm typecheck` 오류 0
 - [x] `pnpm fix` (Biome) 오류 0
 - [x] `.gitignore` 정비
+- [x] Windows `git pull`용 `{env:HOME}` 캐시 추적 제거 및 개발 설정 보강
 
 ---
 

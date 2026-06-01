@@ -231,8 +231,9 @@ Windows에서 `git pull` 후 바로 개발을 시작하기 위해 반드시 수�
 ### Windows git pull 경로 오류 원인
 
 - rust-analyzer의 `extraEnv`가 `${env:HOME}` 변수 치환을 지원하지 않아 `src-tauri/${env:HOME}/...` 같은 리터럴 경로가 실수로 생성될 수 있다.
-- 이 경로의 `$`, `{`, `:` 문자는 Windows NTFS에서 파일명으로 사용 불가 → `git pull` 실패.
-- **해결**: 해당 디렉터리가 git에 추적되지 않도록 `.gitignore`에 패턴 추가. 리터럴 경로 디렉터리는 `rm -rf 'src-tauri/${env:HOME}'`으로 삭제.
+- 이 경로의 `{`, `:`, `}` 문자는 Windows NTFS에서 파일명으로 사용 불가 → `git pull` 또는 checkout 실패.
+- **해결**: `{env:HOME}/...` 캐시 산출물은 git에서 추적하지 않는다. `.gitignore`에 루트/`src-tauri` 리터럴 placeholder 경로를 차단하는 패턴을 둔다.
+- 이미 추적된 캐시가 생겼다면 `git rm --cached -r '{env:HOME}'`로 인덱스에서 제거한 뒤 커밋한다.
 
 ### Windows 초기 설정 절차
 
@@ -240,7 +241,7 @@ Windows에서 `git pull` 후 바로 개발을 시작하기 위해 반드시 수�
 # 1. 의존성 설치
 pnpm install
 
-# 2. Windows 전용 초기화 스크립트 실행 (도구 확인, 캐시 디렉터리 생성, settings.json 경로 수정)
+# 2. Windows 전용 초기화 스크립트 실행 (도구 확인, 캐시 디렉터리 생성, settings.json 경로 자동 수정)
 node scripts/setup-windows.mjs
 
 # 3. FFmpeg 바이너리 다운로드
@@ -256,8 +257,8 @@ winget install Microsoft.VisualStudioBuildTools
 
 ### rust-analyzer 경로 수정 (반드시 수행)
 
-`.vscode/settings.json`에 있는 `rust-analyzer.*.extraEnv`의 `CARGO_TARGET_DIR`은 macOS 절대 경로로 하드코딩되어 있다.  
-Windows에서는 다음 경로로 직접 변경해야 한다:
+`.vscode/settings.json`에 있는 `rust-analyzer.*.extraEnv`의 `CARGO_TARGET_DIR`은 실제 절대 경로여야 한다.
+Windows에서는 `node scripts/setup-windows.mjs`가 다음 형태로 자동 치환한다:
 
 ```json
 "rust-analyzer.server.extraEnv": {
@@ -271,8 +272,6 @@ Windows에서는 다음 경로로 직접 변경해야 한다:
 }
 ```
 
-또는 `node scripts/setup-windows.mjs`를 Windows에서 실행하면 자동으로 치환된다.
-
 > **핵심 주의**: `${env:USERPROFILE}` 같은 VS Code 변수는 `terminal.integrated.env.*`에서는 동작하지만  
 > `rust-analyzer.*.extraEnv`에서는 **절대 치환되지 않는다** — 리터럴 문자열로 경로를 지정해야 한다.
 
@@ -281,3 +280,5 @@ Windows에서는 다음 경로로 직접 변경해야 한다:
 `launch.json`에 이미 Windows 디버그 설정이 포함되어 있다:
 - VS Code에서 F5 → "Debug Tauri App (Windows)" 선택
 - CARGO_TARGET_DIR이 `%USERPROFILE%\.cache\...`로 설정되어 있으므로 내부 드라이브에 빌드됨
+
+`.vscode/tasks.json`의 공통 task는 macOS/Linux 기본값으로 `${env:HOME}`을 사용하되, Windows override에서 `${env:USERPROFILE}` 기반 `CARGO_TARGET_DIR`을 지정한다.

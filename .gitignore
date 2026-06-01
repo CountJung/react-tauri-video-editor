@@ -43,6 +43,12 @@ Thumbs.db
 desktop.ini
 
 # rust-analyzer/CodeLLDB의 CARGO_TARGET_DIR가 리터럴 경로로 잘못 생성된 경우 차단
-# 예) src-tauri/${env:HOME}/... 또는 src-tauri/${env:USERPROFILE}/...
-src-tauri/'${env:HOME}'/
-src-tauri/'${env:USERPROFILE}'/
+# 예) {env:HOME}/..., ${env:HOME}/..., src-tauri/{env:USERPROFILE}/...
+/{env:HOME}/
+/{env:USERPROFILE}/
+/${env:HOME}/
+/${env:USERPROFILE}/
+src-tauri/{env:HOME}/
+src-tauri/{env:USERPROFILE}/
+src-tauri/${env:HOME}/
+src-tauri/${env:USERPROFILE}/
