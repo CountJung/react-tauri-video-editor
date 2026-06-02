@@ -49,6 +49,14 @@ export interface ShapeProps {
 
 // ── 클립 타입 ────────────────────────────────────────────────────────────────
 export type ClipType = 'media' | 'text' | 'shape'
+export type FitMode = 'fit' | 'fill' | 'stretch' | 'center' | 'crop'
+
+export interface CropRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
 export interface Clip {
   id: string
@@ -65,6 +73,8 @@ export interface Clip {
   height: number
   rotation: number // 도(°)
   opacity: number // 0~1 (클립 개별 불투명도)
+  fitMode: FitMode
+  cropRect?: CropRect
   // 타입별 확장 속성
   textProps?: TextProps
   shapeProps?: ShapeProps
@@ -168,7 +178,19 @@ interface TimelineState {
 }
 
 export type ClipCanvasUpdate = Partial<
-  Pick<Clip, 'x' | 'y' | 'width' | 'height' | 'rotation' | 'opacity' | 'textProps' | 'shapeProps'>
+  Pick<
+    Clip,
+    | 'x'
+    | 'y'
+    | 'width'
+    | 'height'
+    | 'rotation'
+    | 'opacity'
+    | 'fitMode'
+    | 'cropRect'
+    | 'textProps'
+    | 'shapeProps'
+  >
 >
 
 interface TimelineActions {
@@ -338,6 +360,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         ...size,
         rotation: 0,
         opacity: 1,
+        fitMode: 'fit',
       }
       const newTracks = state.tracks.map((t) =>
         t.id === trackId ? { ...t, clips: resolveCollisions([...t.clips, clip]) } : t
@@ -447,6 +470,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         height: 120,
         rotation: 0,
         opacity: 1,
+        fitMode: 'fit',
         textProps: defaultText,
       }
       const newTracks = state.tracks.map((t) =>
@@ -472,6 +496,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         height: h,
         rotation: 0,
         opacity: 1,
+        fitMode: 'fit',
         shapeProps: { shapeType, fill: '#3a7bd5', stroke: 'transparent', strokeWidth: 0 },
       }
       const newTracks = state.tracks.map((t) =>

@@ -9,6 +9,7 @@ import EastIcon from '@mui/icons-material/East'
 import MouseIcon from '@mui/icons-material/Mouse'
 import RectangleOutlinedIcon from '@mui/icons-material/RectangleOutlined'
 import Box from '@mui/material/Box'
+import MenuItem from '@mui/material/MenuItem'
 import Slider from '@mui/material/Slider'
 import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
@@ -170,6 +171,30 @@ function SelectPanel() {
           </Typography>
         </Box>
       </Row>
+
+      {clip.clipType === 'media' && (
+        <>
+          <SectionTitle>배치</SectionTitle>
+          <Row label="맞춤">
+            <TextField
+              size="small"
+              select
+              value={clip.fitMode}
+              onChange={(e) =>
+                updateClipCanvas(clip.id, { fitMode: e.target.value as typeof clip.fitMode })
+              }
+              inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
+              fullWidth
+            >
+              <MenuItem value="fit">fit — 비율 유지, 전체 보이기</MenuItem>
+              <MenuItem value="fill">fill — 비율 유지, 꽉 채우기</MenuItem>
+              <MenuItem value="stretch">stretch — 캔버스에 늘리기</MenuItem>
+              <MenuItem value="center">center — 원본 중앙 배치</MenuItem>
+              <MenuItem value="crop">crop — cropRect 사용</MenuItem>
+            </TextField>
+          </Row>
+        </>
+      )}
     </>
   )
 }

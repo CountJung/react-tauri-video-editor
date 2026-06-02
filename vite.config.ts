@@ -28,6 +28,9 @@ export default defineConfig({
     },
   },
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
+  test: {
+    exclude: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**', '**/._*'],
+  },
   build: {
     target: process.env.TAURI_ENV_PLATFORM === 'windows'
       ? 'chrome105'

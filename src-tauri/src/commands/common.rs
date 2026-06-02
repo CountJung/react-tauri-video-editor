@@ -16,7 +16,11 @@ impl AppError {
         }
     }
 
-    pub fn with_details(code: &str, message: impl Into<String>, details: impl Into<String>) -> Self {
+    pub fn with_details(
+        code: &str,
+        message: impl Into<String>,
+        details: impl Into<String>,
+    ) -> Self {
         Self {
             code: code.to_string(),
             message: message.into(),

@@ -1,6 +1,5 @@
-import { convertFileSrc } from '@/lib/invoke'
 import { useAssetStore } from '@/store/assetStore'
-import type { Asset, Clip, Track } from '@/store/timelineStore'
+import type { Clip } from '@/store/timelineStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
@@ -9,6 +8,16 @@ import IconButton from '@mui/material/IconButton'
 import Slider from '@mui/material/Slider'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  collectActiveLayers,
+  drawImageLike,
+  drawShapeClip,
+  drawTextClip,
+  getAssetUrl,
+  getClipLocalTime,
+  hitTestLayers,
+  withClipTransform,
+} from './canvasCompositor'
 
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -16,32 +25,33 @@ function formatTime(sec: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-/** 특정 시간에 활성화된 클립 + 에셋 반환 */
-function findActiveClip(
-  tracks: Track[],
-  assets: Asset[],
-  currentTime: number,
-  trackType: Track['type']
-): { clip: Clip; asset: Asset } | null {
-  for (const track of tracks) {
-    if (track.type !== trackType) continue
-    for (const clip of track.clips) {
-      if (currentTime >= clip.start && currentTime < clip.start + clip.duration) {
-        const asset = assets.find((a) => a.id === clip.assetId)
-        if (asset) return { clip, asset }
-      }
-    }
-  }
-  return null
+function drawSelection(ctx: CanvasRenderingContext2D, clip: Clip): void {
+  ctx.save()
+  ctx.strokeStyle = '#64b5f6'
+  ctx.lineWidth = 2
+  ctx.setLineDash([10, 6])
+  ctx.strokeRect(clip.x, clip.y, clip.width, clip.height)
+  ctx.setLineDash([])
+  ctx.fillStyle = '#64b5f6'
+  const size = 12
+  const points = [
+    [clip.x, clip.y],
+    [clip.x + clip.width / 2, clip.y],
+    [clip.x + clip.width, clip.y],
+    [clip.x, clip.y + clip.height / 2],
+    [clip.x + clip.width, clip.y + clip.height / 2],
+    [clip.x, clip.y + clip.height],
+    [clip.x + clip.width / 2, clip.y + clip.height],
+    [clip.x + clip.width, clip.y + clip.height],
+  ]
+  for (const [x, y] of points) ctx.fillRect(x - size / 2, y - size / 2, size, size)
+  ctx.beginPath()
+  ctx.arc(clip.x + clip.width / 2, clip.y - 38, 7, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
 }
 
-/**
- * 타임라인 합성 프리뷰 플레이어
- *
- * - 비디오 트랙: currentTime에 활성화된 클립의 영상/이미지를 표시
- * - 오버레이 트랙: currentTime에 활성화된 이미지 클립을 비디오 위에 오버레이
- * - 이미지 클립: 해당 구간에서 정지 이미지 표시, 재생 시 타이머로 시간 진행
- */
+/** Phase 5 — Canvas 기반 합성 프리뷰 플레이어 */
 export function PreviewPlayer() {
   const assets = useAssetStore((s) => s.assets)
   const tracks = useTimelineStore((s) => s.tracks)
@@ -50,21 +60,28 @@ export function PreviewPlayer() {
   const storeCurrentTime = useTimelineStore((s) => s.currentTime)
   const canvasWidth = useTimelineStore((s) => s.canvasWidth)
   const canvasHeight = useTimelineStore((s) => s.canvasHeight)
-  const { setPlaying, setCurrentTime } = useTimelineStore()
+  const selectedClipId = useTimelineStore((s) => s.selectedClipId)
+  const { setPlaying, setCurrentTime, selectClip, updateClipCanvas } = useTimelineStore()
 
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const isSyncingRef = useRef(false)
-  const lastVideoTimeRef = useRef(0)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number | null>(null)
-  const rafLastTimestampRef = useRef<number | null>(null)
-  // RAF에서 최신 값을 읽기 위한 ref (스테일 클로저 방지)
+  const playRafRef = useRef<number | null>(null)
+  const playLastTsRef = useRef<number | null>(null)
   const currentTimeRef = useRef(storeCurrentTime)
   const durationRef = useRef(duration)
+  const videoCacheRef = useRef<Map<string, HTMLVideoElement>>(new Map())
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  const dragRef = useRef<{
+    clipId: string
+    startX: number
+    startY: number
+    clipX: number
+    clipY: number
+  } | null>(null)
 
   const [localCurrentTime, setLocalCurrentTime] = useState(0)
   const [isSliderDragging, setIsSliderDragging] = useState(false)
 
-  // RAF/callback에서 최신 값을 읽을 수 있도록 ref 동기화
   useEffect(() => {
     currentTimeRef.current = storeCurrentTime
   }, [storeCurrentTime])
@@ -72,147 +89,180 @@ export function PreviewPlayer() {
     durationRef.current = duration
   }, [duration])
 
-  // 현재 시간에 활성화된 비디오 트랙 콘텐츠 (video or image)
-  const activeVideoContent = useMemo(
-    () => findActiveClip(tracks, assets, storeCurrentTime, 'video'),
+  const activeLayers = useMemo(
+    () => collectActiveLayers(tracks, assets, storeCurrentTime),
     [tracks, assets, storeCurrentTime]
   )
 
-  // 현재 시간에 활성화된 오버레이 클립 목록
-  const activeOverlays = useMemo(() => {
-    const result: Array<{ clip: Clip; asset: Asset }> = []
-    for (const track of tracks) {
-      if (track.type !== 'overlay') continue
-      for (const clip of track.clips) {
-        if (storeCurrentTime >= clip.start && storeCurrentTime < clip.start + clip.duration) {
-          const asset = assets.find((a) => a.id === clip.assetId)
-          if (asset?.type === 'image') result.push({ clip, asset })
+  const selectedClip = useMemo(
+    () => tracks.flatMap((track) => track.clips).find((clip) => clip.id === selectedClipId) ?? null,
+    [tracks, selectedClipId]
+  )
+
+  useEffect(() => {
+    for (const layer of activeLayers) {
+      const asset = layer.asset
+      if (!asset) continue
+      const url = getAssetUrl(asset)
+      if (asset.type === 'image' && !imageCacheRef.current.has(asset.id)) {
+        const img = new Image()
+        img.src = url
+        imageCacheRef.current.set(asset.id, img)
+      }
+      if (asset.type === 'video') {
+        let video = videoCacheRef.current.get(asset.id)
+        if (!video) {
+          video = document.createElement('video')
+          video.muted = true
+          video.playsInline = true
+          video.preload = 'auto'
+          video.src = url
+          videoCacheRef.current.set(asset.id, video)
         }
+        const targetTime = getClipLocalTime(layer.clip, storeCurrentTime)
+        if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.08) {
+          video.currentTime = Math.max(
+            layer.clip.trimStart,
+            Math.min(layer.clip.trimEnd, targetTime)
+          )
+        }
+        if (isPlaying) void video.play().catch(() => {})
+        else video.pause()
       }
     }
-    return result
-  }, [tracks, assets, storeCurrentTime])
+  }, [activeLayers, isPlaying, storeCurrentTime])
 
-  const activeAsset = activeVideoContent?.asset ?? null
-  const activeClip = activeVideoContent?.clip ?? null
-
-  // 활성 비디오 에셋 변경 시 video 소스 교체
-  const prevAssetIdRef = useRef<string | undefined>(undefined)
   useEffect(() => {
-    if (activeAsset?.id === prevAssetIdRef.current) return
-    prevAssetIdRef.current = activeAsset?.id
+    const draw = () => {
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx) return
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    if (activeAsset?.type === 'video' && videoRef.current) {
-      videoRef.current.src = convertFileSrc(activeAsset.path)
-      videoRef.current.load()
-    }
-  }, [activeAsset])
-
-  // isPlaying + activeAsset 변경 → 재생/정지 제어
-  useEffect(() => {
-    if (!activeAsset) return
-
-    if (activeAsset.type === 'video') {
-      const video = videoRef.current
-      if (!video) return
-      if (isPlaying) {
-        video.play().catch(() => setPlaying(false))
-      } else {
-        video.pause()
-      }
-    } else if (activeAsset.type === 'image') {
-      // 이미지 재생: RAF로 타임라인 시간 진행
-      if (isPlaying) {
-        rafLastTimestampRef.current = null
-        const advance = (ts: number) => {
-          if (rafLastTimestampRef.current !== null) {
-            const delta = (ts - rafLastTimestampRef.current) / 1000
-            const next = Math.min(currentTimeRef.current + delta, durationRef.current)
-            currentTimeRef.current = next
-            setLocalCurrentTime(next)
-            setCurrentTime(next)
-            if (next >= durationRef.current) {
-              setPlaying(false)
-              return
+      for (const layer of activeLayers) {
+        const { clip, track, asset } = layer
+        withClipTransform(ctx, clip, track.opacity, () => {
+          if (clip.clipType === 'text') drawTextClip(ctx, clip)
+          else if (clip.clipType === 'shape') drawShapeClip(ctx, clip)
+          else if (asset?.type === 'image') {
+            const img = imageCacheRef.current.get(asset.id)
+            if (img?.complete)
+              drawImageLike(
+                ctx,
+                img,
+                img.naturalWidth || asset.width || clip.width,
+                img.naturalHeight || asset.height || clip.height,
+                clip
+              )
+          } else if (asset?.type === 'video') {
+            const video = videoCacheRef.current.get(asset.id)
+            if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+              drawImageLike(
+                ctx,
+                video,
+                video.videoWidth || asset.width || clip.width,
+                video.videoHeight || asset.height || clip.height,
+                clip
+              )
             }
           }
-          rafLastTimestampRef.current = ts
-          rafRef.current = requestAnimationFrame(advance)
-        }
-        rafRef.current = requestAnimationFrame(advance)
-      } else {
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current)
-          rafRef.current = null
-        }
+        })
       }
+
+      if (selectedClip) drawSelection(ctx, selectedClip)
+      rafRef.current = requestAnimationFrame(draw)
     }
-
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
-      }
-    }
-  }, [isPlaying, activeAsset, setPlaying, setCurrentTime])
-
-  // video timeupdate → 타임라인 currentTime 갱신 (clip offset 보정)
-  const handleVideoTimeUpdate = useCallback(() => {
-    const video = videoRef.current
-    if (!video || isSyncingRef.current || !activeClip) return
-    // video.currentTime은 clip 내부 시간 (trimStart 기준)
-    const timelineTime = activeClip.start + (video.currentTime - activeClip.trimStart)
-    lastVideoTimeRef.current = video.currentTime
-    setLocalCurrentTime(timelineTime)
-    setCurrentTime(timelineTime)
-  }, [activeClip, setCurrentTime])
-
-  const handleVideoLoadedMetadata = useCallback(() => {
-    const video = videoRef.current
-    if (!video || !activeClip) return
-    // 활성 클립의 trimStart로 seek
-    const seekTo = activeClip.trimStart + (storeCurrentTime - activeClip.start)
-    video.currentTime = Math.max(activeClip.trimStart, Math.min(activeClip.trimEnd, seekTo))
-  }, [activeClip, storeCurrentTime])
-
-  const handleVideoEnded = useCallback(() => {
-    setPlaying(false)
-  }, [setPlaying])
-
-  // 외부 currentTime 변경 → video seek (ruler 클릭, 슬라이더 등)
-  useEffect(() => {
-    if (!activeClip || activeAsset?.type !== 'video') return
-    const video = videoRef.current
-    if (!video) return
-
-    const expectedVideoTime = activeClip.trimStart + (storeCurrentTime - activeClip.start)
-    if (Math.abs(lastVideoTimeRef.current - expectedVideoTime) < 0.05) return
-
-    isSyncingRef.current = true
-    lastVideoTimeRef.current = expectedVideoTime
-    setLocalCurrentTime(storeCurrentTime)
-    video.currentTime = Math.max(
-      activeClip.trimStart,
-      Math.min(activeClip.trimEnd, expectedVideoTime)
-    )
-
-    setTimeout(() => {
-      isSyncingRef.current = false
-    }, 50)
-  }, [storeCurrentTime, activeClip, activeAsset?.type])
-
-  // storeCurrentTime 외부 변경 시 localCurrentTime 동기화
-  useEffect(() => {
-    if (!isSliderDragging) {
-      setLocalCurrentTime(storeCurrentTime)
-    }
-  }, [storeCurrentTime, isSliderDragging])
-
-  // 언마운트 시 RAF 정리
-  useEffect(() => {
+    rafRef.current = requestAnimationFrame(draw)
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
     }
+  }, [activeLayers, selectedClip])
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (playRafRef.current !== null) cancelAnimationFrame(playRafRef.current)
+      playRafRef.current = null
+      playLastTsRef.current = null
+      return
+    }
+    const tick = (ts: number) => {
+      if (playLastTsRef.current !== null) {
+        const delta = (ts - playLastTsRef.current) / 1000
+        const next = Math.min(currentTimeRef.current + delta, durationRef.current)
+        currentTimeRef.current = next
+        setLocalCurrentTime(next)
+        setCurrentTime(next)
+        if (next >= durationRef.current) {
+          setPlaying(false)
+          return
+        }
+      }
+      playLastTsRef.current = ts
+      playRafRef.current = requestAnimationFrame(tick)
+    }
+    playRafRef.current = requestAnimationFrame(tick)
+    return () => {
+      if (playRafRef.current !== null) cancelAnimationFrame(playRafRef.current)
+      playRafRef.current = null
+      playLastTsRef.current = null
+    }
+  }, [isPlaying, setCurrentTime, setPlaying])
+
+  useEffect(() => {
+    if (!isSliderDragging) setLocalCurrentTime(storeCurrentTime)
+  }, [storeCurrentTime, isSliderDragging])
+
+  const canvasPoint = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      const canvas = event.currentTarget
+      const rect = canvas.getBoundingClientRect()
+      return {
+        x: ((event.clientX - rect.left) / rect.width) * canvasWidth,
+        y: ((event.clientY - rect.top) / rect.height) * canvasHeight,
+      }
+    },
+    [canvasWidth, canvasHeight]
+  )
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      const point = canvasPoint(event)
+      const hit = hitTestLayers(activeLayers, point.x, point.y)
+      selectClip(hit?.id ?? null)
+      if (hit) {
+        dragRef.current = {
+          clipId: hit.id,
+          startX: point.x,
+          startY: point.y,
+          clipX: hit.x,
+          clipY: hit.y,
+        }
+        event.currentTarget.setPointerCapture(event.pointerId)
+      }
+    },
+    [activeLayers, canvasPoint, selectClip]
+  )
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (!dragRef.current) return
+      const point = canvasPoint(event)
+      const drag = dragRef.current
+      updateClipCanvas(drag.clipId, {
+        x: Math.round(drag.clipX + point.x - drag.startX),
+        y: Math.round(drag.clipY + point.y - drag.startY),
+      })
+    },
+    [canvasPoint, updateClipCanvas]
+  )
+
+  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+    dragRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId)
   }, [])
 
   const handleSliderChange = useCallback((_: Event, value: number | number[]) => {
@@ -233,6 +283,7 @@ export function PreviewPlayer() {
 
   const totalDuration = duration || 1
   const canPlay = duration > 0
+  const activeAssetName = activeLayers.find((layer) => layer.asset)?.asset?.name
 
   return (
     <Box
@@ -244,7 +295,6 @@ export function PreviewPlayer() {
         position: 'relative',
       }}
     >
-      {/* 미디어 영역 */}
       <Box
         sx={{
           flex: 1,
@@ -256,7 +306,6 @@ export function PreviewPlayer() {
           position: 'relative',
         }}
       >
-        {/* 캔버스 비율 유지 컨테이너 */}
         <Box
           sx={{
             aspectRatio: `${canvasWidth} / ${canvasHeight}`,
@@ -266,57 +315,39 @@ export function PreviewPlayer() {
             overflow: 'hidden',
           }}
         >
-          {/* 빈 상태 */}
-          {!activeAsset && activeOverlays.length === 0 && (
-            <Box sx={{ color: 'text.disabled', fontSize: 14 }}>Preview</Box>
-          )}
-
-          {/* 메인 비디오 (항상 렌더, 소스 없으면 숨김) */}
-          {/* biome-ignore lint/a11y/useMediaCaption: 비디오 에디터 프리뷰 */}
-          <video
-            ref={videoRef}
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              display: activeAsset?.type === 'video' ? 'block' : 'none',
-            }}
-            onTimeUpdate={handleVideoTimeUpdate}
-            onLoadedMetadata={handleVideoLoadedMetadata}
-            onEnded={handleVideoEnded}
-          />
-
-          {/* 이미지 클립 (비디오 트랙에 배치된 이미지) */}
-          {activeAsset?.type === 'image' && (
+          {activeLayers.length === 0 && (
             <Box
-              component="img"
-              src={convertFileSrc(activeAsset.path)}
-              alt={activeAsset.name}
-              sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
-          )}
-
-          {/* 오버레이 이미지 (overlay 트랙 클립 — 비디오 위에 겹침) */}
-          {activeOverlays.map(({ clip, asset: overlayAsset }) => (
-            <Box
-              key={clip.id}
-              component="img"
-              src={convertFileSrc(overlayAsset.path)}
-              alt={overlayAsset.name}
               sx={{
+                color: 'text.disabled',
+                fontSize: 14,
                 position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                pointerEvents: 'none',
+                inset: 0,
+                display: 'grid',
+                placeItems: 'center',
               }}
-            />
-          ))}
+            >
+              Preview
+            </Box>
+          )}
+          <Box
+            component="canvas"
+            ref={canvasRef}
+            width={canvasWidth}
+            height={canvasHeight}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            sx={{
+              display: 'block',
+              width: '100%',
+              height: '100%',
+              cursor: dragRef.current ? 'grabbing' : 'default',
+            }}
+          />
         </Box>
       </Box>
 
-      {/* 컨트롤 바 */}
       <Box
         sx={{
           display: 'flex',
@@ -329,7 +360,6 @@ export function PreviewPlayer() {
           borderColor: 'divider',
         }}
       >
-        {/* 시크 슬라이더 */}
         <Slider
           size="small"
           min={0}
@@ -341,8 +371,6 @@ export function PreviewPlayer() {
           sx={{ py: 0.5, color: 'primary.main' }}
           disabled={!canPlay}
         />
-
-        {/* 재생 컨트롤 + 시간 표시 */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <IconButton size="small" onClick={() => setPlaying(!isPlaying)} disabled={!canPlay}>
             {isPlaying ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
@@ -351,7 +379,7 @@ export function PreviewPlayer() {
             {formatTime(isSliderDragging ? localCurrentTime : storeCurrentTime)} /{' '}
             {formatTime(totalDuration)}
           </Typography>
-          {activeAsset && (
+          {activeAssetName && (
             <Typography
               variant="caption"
               sx={{
@@ -362,9 +390,9 @@ export function PreviewPlayer() {
                 whiteSpace: 'nowrap',
                 maxWidth: 120,
               }}
-              title={activeAsset.name}
+              title={activeAssetName}
             >
-              {activeAsset.name}
+              {activeAssetName}
             </Typography>
           )}
         </Box>

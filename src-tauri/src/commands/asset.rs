@@ -1,5 +1,5 @@
-use std::path::Path;
 use crate::commands::common::AppError;
+use std::path::Path;
 
 const VIDEO_EXTS: &[&str] = &["mp4", "mov", "avi", "mkv", "webm"];
 const AUDIO_EXTS: &[&str] = &["mp3", "wav", "aac", "flac", "ogg", "m4a"];
@@ -35,16 +35,17 @@ pub async fn asset_import(path: String) -> Result<AssetMeta, AppError> {
     let p = Path::new(&path);
 
     if !p.exists() {
-        return Err(AppError::new("FILE_NOT_FOUND", format!("File not found: {path}")));
+        return Err(AppError::new(
+            "FILE_NOT_FOUND",
+            format!("File not found: {path}"),
+        ));
     }
 
-    let ext = p
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
+    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
 
-    let asset_type = asset_type_from_ext(ext)
-        .ok_or_else(|| AppError::new("UNSUPPORTED_FORMAT", format!("Unsupported format: .{ext}")))?;
+    let asset_type = asset_type_from_ext(ext).ok_or_else(|| {
+        AppError::new("UNSUPPORTED_FORMAT", format!("Unsupported format: .{ext}"))
+    })?;
 
     let name = p
         .file_name()
@@ -65,10 +66,7 @@ pub async fn asset_import(path: String) -> Result<AssetMeta, AppError> {
 
 /// ffprobe로 미디어 메타데이터 추출
 #[tauri::command]
-pub async fn asset_probe(
-    app: tauri::AppHandle,
-    path: String,
-) -> Result<AssetMeta, AppError> {
+pub async fn asset_probe(app: tauri::AppHandle, path: String) -> Result<AssetMeta, AppError> {
     use tauri_plugin_shell::ShellExt;
 
     let output = app
@@ -76,8 +74,10 @@ pub async fn asset_probe(
         .sidecar("ffprobe")
         .map_err(|e| AppError::new("FFPROBE_NOT_FOUND", e.to_string()))?
         .args([
-            "-v", "quiet",
-            "-print_format", "json",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
             "-show_streams",
             "-show_format",
             &path,
@@ -95,8 +95,7 @@ pub async fn asset_probe(
         .unwrap_or(0.0);
 
     let streams = json["streams"].as_array();
-    let video = streams
-        .and_then(|s| s.iter().find(|s| s["codec_type"] == "video"));
+    let video = streams.and_then(|s| s.iter().find(|s| s["codec_type"] == "video"));
 
     let width = video.and_then(|s| s["width"].as_u64()).map(|v| v as u32);
     let height = video.and_then(|s| s["height"].as_u64()).map(|v| v as u32);
@@ -104,7 +103,11 @@ pub async fn asset_probe(
     let p = Path::new(&path);
     let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
     let asset_type = asset_type_from_ext(ext).unwrap_or("video");
-    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string();
+    let name = p
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
 
     Ok(AssetMeta {
         id: uuid_v4(),
@@ -123,5 +126,12 @@ fn uuid_v4() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .subsec_nanos();
-    format!("{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}", t, t >> 8, t & 0xfff, t >> 4, t as u64)
+    format!(
+        "{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
+        t,
+        t >> 8,
+        t & 0xfff,
+        t >> 4,
+        t as u64
+    )
 }

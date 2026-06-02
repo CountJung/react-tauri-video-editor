@@ -217,7 +217,10 @@ export function AssetPanel() {
               }
             }
           } catch (error) {
-            console.warn('[AssetPanel] asset_probe failed, keep basic metadata:', { filePath, error })
+            console.warn('[AssetPanel] asset_probe failed, keep basic metadata:', {
+              filePath,
+              error,
+            })
             // ffprobe 실패 시 기본 메타 유지
           } finally {
             setLoadingIds((prev) => {

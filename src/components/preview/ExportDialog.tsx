@@ -19,6 +19,13 @@ interface ClipExportInfo {
   asset_path: string
   trim_start: number
   trim_end: number
+  fit_mode: string
+  crop_x?: number
+  crop_y?: number
+  crop_width?: number
+  crop_height?: number
+  canvas_width: number
+  canvas_height: number
 }
 
 interface FfmpegProgress {
@@ -41,7 +48,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
   const [progress, setProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
 
-  const { tracks } = useTimelineStore()
+  const { tracks, canvasWidth, canvasHeight } = useTimelineStore()
   const { assets } = useAssetStore()
 
   // 리스너 정리용 ref
@@ -86,11 +93,18 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
           asset_path: asset.path,
           trim_start: clip.trimStart,
           trim_end: clip.trimEnd,
+          fit_mode: clip.fitMode,
+          crop_x: clip.cropRect?.x,
+          crop_y: clip.cropRect?.y,
+          crop_width: clip.cropRect?.width,
+          crop_height: clip.cropRect?.height,
+          canvas_width: canvasWidth,
+          canvas_height: canvasHeight,
         })
       }
     }
     return clips
-  }, [tracks, assets])
+  }, [tracks, assets, canvasWidth, canvasHeight])
 
   const handleExport = async () => {
     if (!outputPath) {

@@ -1,13 +1,22 @@
+use crate::commands::common::{
+    AppError, EVENT_FFMPEG_DONE, EVENT_FFMPEG_ERROR, EVENT_FFMPEG_PROGRESS, EVENT_THUMBNAIL_READY,
+};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
-use crate::commands::common::{AppError, EVENT_FFMPEG_DONE, EVENT_FFMPEG_ERROR, EVENT_FFMPEG_PROGRESS, EVENT_THUMBNAIL_READY};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct ClipExportInfo {
     pub asset_path: String,
     pub trim_start: f64,
     pub trim_end: f64,
+    pub fit_mode: Option<String>,
+    pub crop_x: Option<f64>,
+    pub crop_y: Option<f64>,
+    pub crop_width: Option<f64>,
+    pub crop_height: Option<f64>,
+    pub canvas_width: Option<u32>,
+    pub canvas_height: Option<u32>,
 }
 
 #[derive(Debug, serde::Serialize, Clone)]
@@ -79,11 +88,16 @@ pub async fn generate_thumbnail(
         .sidecar("ffmpeg")
         .map_err(|e| AppError::new("FFMPEG_NOT_FOUND", e.to_string()))?
         .args([
-            "-ss", &format!("{time_sec:.3}"),
-            "-i", &asset_path,
-            "-vframes", "1",
-            "-vf", "scale=160:-1",
-            "-q:v", "3",
+            "-ss",
+            &format!("{time_sec:.3}"),
+            "-i",
+            &asset_path,
+            "-vframes",
+            "1",
+            "-vf",
+            "scale=160:-1",
+            "-q:v",
+            "3",
             "-y",
             &output_path,
         ])
@@ -101,34 +115,79 @@ fn build_concat_args(clips: &[ClipExportInfo], output_path: &str) -> Vec<String>
     let mut args: Vec<String> = Vec::new();
 
     for clip in clips {
+        let clip_duration = (clip.trim_end - clip.trim_start).max(0.0);
         args.extend([
             "-ss".into(),
             format!("{:.3}", clip.trim_start),
+            "-t".into(),
+            format!("{clip_duration:.3}"),
             "-i".into(),
             clip.asset_path.clone(),
         ]);
     }
 
-    // filter_complex concat
+    // 각 클립을 동일 캔버스 크기로 정규화한 뒤 concat한다.
     let n = clips.len();
-    let filter = (0..n)
-        .map(|i| format!("[{i}:v][{i}:a]"))
-        .collect::<String>()
-        + &format!("concat=n={n}:v=1:a=1[v][a]");
+    let mut filter_parts: Vec<String> = Vec::new();
+    let mut concat_inputs = String::new();
+    for (i, clip) in clips.iter().enumerate() {
+        let canvas_w = clip.canvas_width.unwrap_or(1920);
+        let canvas_h = clip.canvas_height.unwrap_or(1080);
+        let video_filter = build_fit_filter(clip, canvas_w, canvas_h);
+        filter_parts.push(format!("[{i}:v]{video_filter},setsar=1[v{i}]"));
+        filter_parts.push(format!("[{i}:a]anull[a{i}]"));
+        concat_inputs.push_str(&format!("[v{i}][a{i}]"));
+    }
+    filter_parts.push(format!("{concat_inputs}concat=n={n}:v=1:a=1[v][a]"));
+    let filter = filter_parts.join(";");
 
     args.extend([
         "-filter_complex".into(),
         filter,
-        "-map".into(), "[v]".into(),
-        "-map".into(), "[a]".into(),
-        "-c:v".into(), "libx264".into(),
-        "-crf".into(), "23".into(),
-        "-c:a".into(), "aac".into(),
+        "-map".into(),
+        "[v]".into(),
+        "-map".into(),
+        "[a]".into(),
+        "-c:v".into(),
+        "libx264".into(),
+        "-crf".into(),
+        "23".into(),
+        "-c:a".into(),
+        "aac".into(),
         "-y".into(),
         output_path.to_string(),
     ]);
 
     args
+}
+
+fn build_fit_filter(clip: &ClipExportInfo, canvas_w: u32, canvas_h: u32) -> String {
+    match clip.fit_mode.as_deref().unwrap_or("fit") {
+        "fill" => format!(
+            "scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=increase,crop={canvas_w}:{canvas_h}"
+        ),
+        "stretch" => format!("scale={canvas_w}:{canvas_h}"),
+        "center" => format!(
+            "scale='min(iw,{canvas_w})':'min(ih,{canvas_h})':force_original_aspect_ratio=decrease,pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2"
+        ),
+        "crop" => {
+            if let (Some(x), Some(y), Some(w), Some(h)) = (
+                clip.crop_x,
+                clip.crop_y,
+                clip.crop_width,
+                clip.crop_height,
+            ) {
+                format!("crop={w:.0}:{h:.0}:{x:.0}:{y:.0},scale={canvas_w}:{canvas_h}")
+            } else {
+                format!(
+                    "scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=decrease,pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2"
+                )
+            }
+        }
+        _ => format!(
+            "scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=decrease,pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2"
+        ),
+    }
 }
 
 fn parse_ffmpeg_progress(line: &[u8], total_duration: f64) -> Option<FfmpegProgress> {

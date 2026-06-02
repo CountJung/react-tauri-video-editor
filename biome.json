@@ -1,12 +1,18 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": { "enabled": true },
+  "organizeImports": {
+    "enabled": true
+  },
   "linter": {
     "enabled": true,
     "rules": {
       "recommended": true,
-      "correctness": { "noUnusedVariables": "error" },
-      "suspicious": { "noExplicitAny": "warn" }
+      "correctness": {
+        "noUnusedVariables": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn"
+      }
     }
   },
   "formatter": {
@@ -20,7 +26,8 @@
       "node_modules",
       "dist",
       "src/routeTree.gen.ts",
-      "src-tauri"
+      "src-tauri",
+      "**/._*"
     ]
   },
   "javascript": {

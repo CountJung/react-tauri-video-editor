@@ -73,6 +73,14 @@ pub struct ClipExportInfo {
     pub asset_path: String,
     pub trim_start: f64,
     pub trim_end: f64,
+    // Phase 5 Canvas fit/crop metadata. Frontend sends these from ExportDialog.
+    pub fit_mode: Option<String>, // fit | fill | stretch | center | crop
+    pub crop_x: Option<f64>,
+    pub crop_y: Option<f64>,
+    pub crop_width: Option<f64>,
+    pub crop_height: Option<f64>,
+    pub canvas_width: Option<u32>,
+    pub canvas_height: Option<u32>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -82,6 +90,16 @@ pub struct FfmpegProgress {
     pub total_time: f32,
 }
 ```
+
+### Canvas fitMode Export 필터
+
+- `fit`: `scale=...:force_original_aspect_ratio=decrease` 후 `pad`로 캔버스 중앙 정렬.
+- `fill`: `scale=...:force_original_aspect_ratio=increase` 후 `crop`으로 캔버스 채움.
+- `stretch`: 비율 무시 `scale={canvas_w}:{canvas_h}`.
+- `center`: 원본보다 큰 경우만 축소하고 `pad`로 중앙 배치.
+- `crop`: `crop_x/y/width/height`가 있으면 `crop` 후 캔버스 크기로 `scale`.
+
+Export는 프리뷰 중이 아니라 Export 시점에만 FFmpeg를 호출해야 하며, 프론트엔드 `Clip.fitMode`/`cropRect`/캔버스 크기와 Rust `ClipExportInfo` 필드를 함께 갱신한다.
 
 ### 진행률 파싱
 

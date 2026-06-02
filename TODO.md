@@ -183,15 +183,15 @@
 - [x] **데이터 모델** — `Track`에 레이어 속성 추가 (`visible, locked, opacity, zIndex`)
 - [x] **데이터 모델** — `TextClip` 타입 정의 (`TextProps`: text, fontFamily, fontSize, color, bold, italic, align, shadow, outline)
 - [x] **데이터 모델** — `ShapeClip` 타입 정의 (`ShapeProps`: shapeType: rect|circle|arrow, fill, stroke, strokeWidth, dash, cornerRadius)
-- [ ] **CanvasCompositor** — PreviewPlayer를 Canvas 기반으로 재설계
+- [x] **CanvasCompositor** — PreviewPlayer를 Canvas 기반으로 재설계
   - `<canvas>` 위에 프레임마다 레이어 순서(zIndex)대로 drawImage/fillText/drawShape
   - 비디오 프레임: offscreen `<video>` → `ctx.drawImage(video, x, y, w, h)`
   - 이미지: `ctx.drawImage(img, ...)`
   - 텍스트: `ctx.fillText(...)` with transform
   - 도형: path-based drawing
-- [ ] **Canvas 선택 인터랙션** — 클릭으로 오브젝트 선택 (hit testing)
-- [ ] **Transform Handles** — 선택된 오브젝트의 8방향 리사이즈 핸들 + 회전 핸들 표시
-- [ ] **에셋 크기 맞춤 모드** — 프로젝트 캔버스 크기와 클립 원본 크기가 다를 때 배치 정책
+- [x] **Canvas 선택 인터랙션** — 클릭으로 오브젝트 선택 (hit testing)
+- [x] **Transform Handles** — 선택된 오브젝트의 8방향 리사이즈 핸들 + 회전 핸들 표시
+- [x] **에셋 크기 맞춤 모드** — 프로젝트 캔버스 크기와 클립 원본 크기가 다를 때 배치 정책
   - `fit`    — 비율 유지, 캔버스 안에 맞춤 (레터박스/필러박스)
   - `fill`   — 비율 유지, 캔버스 꽉 채움 (초과 부분 crop)
   - `stretch`— 비율 무시, 캔버스 크기에 맞게 늘리기
@@ -199,7 +199,7 @@
   - `crop`   — 사용자가 직접 `cropRect` 지정 (Crop 도구 연동)
   - `Clip` 에 `fitMode: 'fit' | 'fill' | 'stretch' | 'center' | 'crop'` 속성 추가
   - 클립 우클릭 컨텍스트 메뉴 또는 속성 패널에서 변경 가능
-- [ ] **fitMode → FFmpeg Export 연동** — fit/fill/stretch를 `scale` + `pad`/`crop` 필터로 변환
+- [x] **fitMode → FFmpeg Export 연동** — fit/fill/stretch를 `scale` + `pad`/`crop` 필터로 변환
 
 ---
 
@@ -260,8 +260,8 @@
 
 ## Phase 7 — 텍스트 & 도형 렌더링
 
-- [ ] **TextClip Canvas 렌더링** — fontFamily, fontSize, color, bold, italic, shadow, outline
-- [ ] **ShapeClip Canvas 렌더링** — fill, stroke, strokeWidth, opacity, dash pattern
+- [x] **TextClip Canvas 렌더링** — fontFamily, fontSize, color, bold, italic, shadow, outline
+- [x] **ShapeClip Canvas 렌더링** — fill, stroke, strokeWidth, opacity, dash pattern
 - [ ] **텍스트 편집 팝업** — 더블클릭 → ResizableDialog 인라인 에디터
 - [ ] **폰트 선택** — Google Fonts 또는 시스템 폰트 목록 조회
 - [ ] **색상 피커** — MUI Color Picker 통합
@@ -324,4 +324,6 @@
 - [x] **undo/redo** — Phase 4-c로 이관 (상세 항목 참조)
 - [x] **키보드 단축키** — Phase 4-c로 이관 (상세 항목 참조)
 - [x] **프로젝트 저장/불러오기** — Phase 4-b로 이관 (상세 항목 참조)
+- [x] **macOS AppleDouble 메타데이터 방어** — `._*` 파일이 Biome/Vitest 검증에 섞이지 않도록 ignore 설정 추가
+- [ ] **외장 볼륨 Cargo target 보완** — Tauri permission 생성 중 `._default.toml`이 생기는 환경에서는 `CARGO_TARGET_DIR`를 로컬 디스크로 지정하는 검증 스크립트/문서화 필요
 - [ ] `.github/prompts/` — `new-route.prompt.md`, `new-command.prompt.md` 내용 검토
