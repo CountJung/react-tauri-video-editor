@@ -4,18 +4,18 @@
     {
       "label": "start-vite-dev-server",
       "type": "shell",
-      "command": "pnpm dev:vite",
+      "command": "pnpm dev:vite:vscode",
       "isBackground": true,
       "problemMatcher": {
         "owner": "vite",
         "pattern": {
-          "regexp": "^.*(ERROR|error).*$",
+          "regexp": "^VITE_EXIT_BEFORE_READY (.*)$",
           "message": 1
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "^.*vite.*$",
-          "endsPattern": "ready in"
+          "beginsPattern": "^VITE_START",
+          "endsPattern": "^VITE_READY"
         }
       },
       "presentation": {
