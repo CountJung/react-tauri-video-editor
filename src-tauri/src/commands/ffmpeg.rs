@@ -37,6 +37,8 @@ pub async fn ffmpeg_export(
         return Err(AppError::new("NO_CLIPS", "No clips to export"));
     }
 
+    validate_export_clips(&clips)?;
+
     let total_duration: f64 = clips.iter().map(|c| c.trim_end - c.trim_start).sum();
     let args = build_concat_args(&clips, &output_path);
 
@@ -84,7 +86,8 @@ pub async fn generate_thumbnail(
             .map_err(|e| AppError::new("MKDIR_FAILED", e.to_string()))?;
     }
 
-    app.shell()
+    let output = app
+        .shell()
         .sidecar("ffmpeg")
         .map_err(|e| AppError::new("FFMPEG_NOT_FOUND", e.to_string()))?
         .args([
@@ -105,11 +108,44 @@ pub async fn generate_thumbnail(
         .await
         .map_err(|e| AppError::new("THUMBNAIL_FAILED", e.to_string()))?;
 
+    if !output.status.success() {
+        return Err(AppError::with_details(
+            "THUMBNAIL_FAILED",
+            "FFmpeg thumbnail generation failed",
+            String::from_utf8_lossy(&output.stderr).to_string(),
+        ));
+    }
+
     app.emit(EVENT_THUMBNAIL_READY, &output_path).ok();
     Ok(output_path)
 }
 
 // ---- 내부 유틸 ----------------------------------------------------------
+
+fn validate_export_clips(clips: &[ClipExportInfo]) -> Result<(), AppError> {
+    for (index, clip) in clips.iter().enumerate() {
+        if clip.asset_path.trim().is_empty() {
+            return Err(AppError::new(
+                "INVALID_CLIP",
+                format!("Clip #{index} has an empty asset path"),
+            ));
+        }
+        if !clip.trim_start.is_finite()
+            || !clip.trim_end.is_finite()
+            || clip.trim_start < 0.0
+            || clip.trim_end <= clip.trim_start
+        {
+            return Err(AppError::new(
+                "INVALID_CLIP",
+                format!(
+                    "Clip #{index} has an invalid trim range: {:.3}..{:.3}",
+                    clip.trim_start, clip.trim_end
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
 
 fn build_concat_args(clips: &[ClipExportInfo], output_path: &str) -> Vec<String> {
     let mut args: Vec<String> = Vec::new();
@@ -193,8 +229,8 @@ fn build_fit_filter(clip: &ClipExportInfo, canvas_w: u32, canvas_h: u32) -> Stri
 fn parse_ffmpeg_progress(line: &[u8], total_duration: f64) -> Option<FfmpegProgress> {
     let s = std::str::from_utf8(line).ok()?;
     let time_pos = s.find("time=")?;
-    let time_str = s.get(time_pos + 5..time_pos + 16)?; // "HH:MM:SS.mm"
-    let current = parse_time_str(time_str)?;
+    let time_value = s[time_pos + 5..].split_whitespace().next()?;
+    let current = parse_time_str(time_value)?;
     let percent = if total_duration > 0.0 {
         (current / total_duration * 100.0).min(100.0) as f32
     } else {

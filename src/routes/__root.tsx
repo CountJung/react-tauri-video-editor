@@ -35,7 +35,7 @@ import {
   saveProjectFile,
   useProjectStore,
 } from '../store/projectStore'
-import { useTimelineStore } from '../store/timelineStore'
+import { type Asset, type Track, useTimelineStore } from '../store/timelineStore'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -169,9 +169,11 @@ function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
     })) as string | null
     if (!selected) return
     const { json } = await loadProjectFile(selected)
-    const parsed = JSON.parse(json) as { tracks?: unknown; assets?: unknown }
-    if (parsed.tracks) useTimelineStore.setState({ tracks: parsed.tracks as never })
-    if (parsed.assets) useAssetStore.setState({ assets: parsed.assets as never })
+    const parsed = JSON.parse(json) as { tracks?: Track[]; assets?: Asset[] }
+    useTimelineStore.getState().loadTracks(parsed.tracks ?? [])
+    useAssetStore.getState().loadAssets(parsed.assets ?? [])
+    useHistoryStore.getState().clearHistory()
+    useProjectStore.getState().clearDirty()
   }, [])
 
   const handleOpen = useCallback(() => {
@@ -185,9 +187,11 @@ function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
       guardDirty(async () => {
         try {
           const { json } = await loadProjectFile(filePath)
-          const parsed = JSON.parse(json) as { tracks?: unknown; assets?: unknown }
-          if (parsed.tracks) useTimelineStore.setState({ tracks: parsed.tracks as never })
-          if (parsed.assets) useAssetStore.setState({ assets: parsed.assets as never })
+          const parsed = JSON.parse(json) as { tracks?: Track[]; assets?: Asset[] }
+          useTimelineStore.getState().loadTracks(parsed.tracks ?? [])
+          useAssetStore.getState().loadAssets(parsed.assets ?? [])
+          useHistoryStore.getState().clearHistory()
+          useProjectStore.getState().clearDirty()
         } catch {
           useProjectStore.getState().removeRecent(filePath)
         }

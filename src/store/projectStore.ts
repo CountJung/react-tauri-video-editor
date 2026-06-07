@@ -1,6 +1,8 @@
 import { tauriInvoke } from '@/lib/invoke'
 import { STORAGE_KEYS } from '@/lib/storageKeys'
 import { create } from 'zustand'
+import { useAssetStore } from './assetStore'
+import { useHistoryStore } from './historyStore'
 import { useTimelineStore } from './timelineStore'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,7 +151,9 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
       height: presetId === 'custom' && customH ? customH : presetDef.height,
     })
     set({ currentProject: meta, isDirty: false })
-    useTimelineStore.getState().setCanvasDimensions(meta.canvasWidth, meta.canvasHeight)
+    useTimelineStore.getState().resetTimeline(meta.canvasWidth, meta.canvasHeight)
+    useAssetStore.getState().clearAssets()
+    useHistoryStore.getState().clearHistory()
     return meta
   },
 

@@ -86,6 +86,14 @@ pub async fn asset_probe(app: tauri::AppHandle, path: String) -> Result<AssetMet
         .await
         .map_err(|e| AppError::new("PROBE_FAILED", e.to_string()))?;
 
+    if !output.status.success() {
+        return Err(AppError::with_details(
+            "PROBE_FAILED",
+            "ffprobe metadata extraction failed",
+            String::from_utf8_lossy(&output.stderr).to_string(),
+        ));
+    }
+
     let json: serde_json::Value = serde_json::from_slice(&output.stdout)
         .map_err(|e| AppError::new("PROBE_PARSE", e.to_string()))?;
 

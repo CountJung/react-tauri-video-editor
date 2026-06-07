@@ -159,6 +159,56 @@ function makeTrack(type: TrackType, zIndex: number): Track {
   }
 }
 
+function makeDefaultTracks(): Track[] {
+  return [
+    {
+      id: 'track-v1',
+      type: 'video',
+      clips: [],
+      visible: true,
+      locked: false,
+      opacity: 1,
+      zIndex: 0,
+    },
+    {
+      id: 'track-ol1',
+      type: 'overlay',
+      clips: [],
+      visible: true,
+      locked: false,
+      opacity: 1,
+      zIndex: 1,
+    },
+    {
+      id: 'track-t1',
+      type: 'text',
+      clips: [],
+      visible: true,
+      locked: false,
+      opacity: 1,
+      zIndex: 2,
+    },
+    {
+      id: 'track-s1',
+      type: 'shape',
+      clips: [],
+      visible: true,
+      locked: false,
+      opacity: 1,
+      zIndex: 3,
+    },
+    {
+      id: 'track-a1',
+      type: 'audio',
+      clips: [],
+      visible: true,
+      locked: false,
+      opacity: 1,
+      zIndex: -1,
+    },
+  ]
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 상태 & 액션
 // ─────────────────────────────────────────────────────────────────────────────
@@ -235,6 +285,8 @@ interface TimelineActions {
 
   // 캔버스
   setCanvasDimensions: (width: number, height: number) => void
+  resetTimeline: (width?: number, height?: number) => void
+  loadTracks: (tracks: Track[]) => void
 
   // 재생
   setCurrentTime: (time: number) => void
@@ -256,53 +308,7 @@ function readStoredNumber(key: string, envVal: string | undefined, fallback: num
 }
 
 export const useTimelineStore = create<TimelineState & TimelineActions>((set, get) => ({
-  tracks: [
-    {
-      id: 'track-v1',
-      type: 'video',
-      clips: [],
-      visible: true,
-      locked: false,
-      opacity: 1,
-      zIndex: 0,
-    },
-    {
-      id: 'track-ol1',
-      type: 'overlay',
-      clips: [],
-      visible: true,
-      locked: false,
-      opacity: 1,
-      zIndex: 1,
-    },
-    {
-      id: 'track-t1',
-      type: 'text',
-      clips: [],
-      visible: true,
-      locked: false,
-      opacity: 1,
-      zIndex: 2,
-    },
-    {
-      id: 'track-s1',
-      type: 'shape',
-      clips: [],
-      visible: true,
-      locked: false,
-      opacity: 1,
-      zIndex: 3,
-    },
-    {
-      id: 'track-a1',
-      type: 'audio',
-      clips: [],
-      visible: true,
-      locked: false,
-      opacity: 1,
-      zIndex: -1,
-    },
-  ],
+  tracks: makeDefaultTracks(),
   currentTime: 0,
   duration: 0,
   zoom: readStoredNumber(STORAGE_KEYS.SETTINGS_DEFAULT_ZOOM, import.meta.env.VITE_DEFAULT_ZOOM, 50),
@@ -384,8 +390,8 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
     }),
 
   trimClipStart: (clipId, newTrimStart) =>
-    set((state) => ({
-      tracks: state.tracks.map((t) => ({
+    set((state) => {
+      const newTracks = state.tracks.map((t) => ({
         ...t,
         clips: t.clips.map((c) => {
           if (c.id !== clipId) return c
@@ -393,20 +399,22 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
           const duration = c.trimEnd - trimStart
           return { ...c, trimStart, start: c.start + (trimStart - c.trimStart), duration }
         }),
-      })),
-    })),
+      }))
+      return { tracks: newTracks, duration: calcDuration(newTracks) }
+    }),
 
   trimClipEnd: (clipId, newTrimEnd) =>
-    set((state) => ({
-      tracks: state.tracks.map((t) => ({
+    set((state) => {
+      const newTracks = state.tracks.map((t) => ({
         ...t,
         clips: t.clips.map((c) => {
           if (c.id !== clipId) return c
           const trimEnd = Math.max(c.trimStart + 0.1, newTrimEnd)
           return { ...c, trimEnd, duration: trimEnd - c.trimStart }
         }),
-      })),
-    })),
+      }))
+      return { tracks: newTracks, duration: calcDuration(newTracks) }
+    }),
 
   removeClip: (clipId) =>
     set((state) => {
@@ -438,7 +446,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
           clips: t.clips.flatMap((c) => (c.id === clipId ? [leftClip, rightClip] : [c])),
         }
       })
-      return { tracks: newTracks }
+      return { tracks: newTracks, duration: calcDuration(newTracks) }
     }),
 
   // ── 텍스트 & 도형 클립 ───────────────────────────────────────────────────
@@ -520,6 +528,26 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
   // ── 재생 ─────────────────────────────────────────────────────────────────
 
   setCanvasDimensions: (width, height) => set({ canvasWidth: width, canvasHeight: height }),
+
+  resetTimeline: (width, height) =>
+    set((state) => ({
+      tracks: makeDefaultTracks(),
+      currentTime: 0,
+      duration: 0,
+      isPlaying: false,
+      selectedClipId: null,
+      canvasWidth: width ?? state.canvasWidth,
+      canvasHeight: height ?? state.canvasHeight,
+    })),
+
+  loadTracks: (tracks) =>
+    set({
+      tracks,
+      currentTime: 0,
+      duration: calcDuration(tracks),
+      isPlaying: false,
+      selectedClipId: null,
+    }),
 
   setCurrentTime: (time) => set({ currentTime: Math.max(0, time) }),
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),

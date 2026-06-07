@@ -12,6 +12,8 @@ interface AssetActions {
   updateAsset: (id: string, updates: Partial<Asset>) => void
   updateThumbnail: (id: string, thumbnailPath: string) => void
   setSelectedAsset: (id: string | null) => void
+  loadAssets: (assets: Asset[]) => void
+  clearAssets: () => void
 }
 
 export const useAssetStore = create<AssetState & AssetActions>((set) => ({
@@ -42,4 +44,8 @@ export const useAssetStore = create<AssetState & AssetActions>((set) => ({
     })),
 
   setSelectedAsset: (id) => set({ selectedAssetId: id }),
+
+  loadAssets: (assets) => set({ assets, selectedAssetId: null }),
+
+  clearAssets: () => set({ assets: [], selectedAssetId: null }),
 }))

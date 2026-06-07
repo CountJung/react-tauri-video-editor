@@ -22,7 +22,25 @@ pub fn project_save(path: String, json: String) -> Result<(), AppError> {
         }
     }
 
-    std::fs::write(p, json.as_bytes()).map_err(|e| {
+    if let Err(e) = serde_json::from_str::<serde_json::Value>(&json) {
+        return Err(AppError::with_details(
+            "PROJECT_INVALID_JSON",
+            "프로젝트 JSON 형식이 올바르지 않습니다",
+            e.to_string(),
+        ));
+    }
+
+    let tmp_path = p.with_extension("vedproj.tmp");
+    std::fs::write(&tmp_path, json.as_bytes()).map_err(|e| {
+        AppError::with_details(
+            "PROJECT_SAVE_ERROR",
+            format!("프로젝트 임시 파일 저장 실패: {}", tmp_path.display()),
+            e.to_string(),
+        )
+    })?;
+
+    std::fs::rename(&tmp_path, p).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp_path);
         AppError::with_details(
             "PROJECT_SAVE_ERROR",
             format!("프로젝트 저장 실패: {}", p.display()),

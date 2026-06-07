@@ -306,12 +306,34 @@
 
 ## Phase 10 — FFmpeg Export 고도화
 
+- [ ] **Export Payload 재설계** — 단순 clips 배열 대신 `projectMeta + tracks + assets` 전체 타임라인 모델을 Rust로 전달
+- [ ] **타임라인 위치/갭 Export 반영** — clip `start`, 빈 구간, overlap 정책을 FFmpeg filter graph에 반영
 - [ ] **오버레이 합성 Export** — overlay 트랙 이미지/비디오를 FFmpeg overlay 필터로 합성
 - [ ] **텍스트 Export** — FFmpeg `drawtext` 필터로 텍스트 번인(burn-in)
 - [ ] **도형 Export** — FFmpeg `drawbox`/`geq` 필터 또는 GIF 오버레이
 - [ ] **트랙 가시성 Export** — visible=false 트랙 제외
 - [ ] **오디오 믹싱** — 다중 오디오 트랙 `amix` 필터
+- [ ] **무음/오디오 없는 소스 Export 대응** — 비디오/이미지 입력에 오디오 스트림이 없을 때 `anullsrc` fallback 또는 무음 export 경로 구현
 - [ ] **해상도·프레임레이트 설정** — Export 옵션 UI 추가
+- [ ] **프리뷰-Export 일치성 테스트** — 대표 프로젝트 fixture로 Canvas Preview 모델과 Export 결과가 같은지 회귀 검증
+
+---
+
+## 리뷰 기반 개선 백로그
+
+- [x] **프로젝트 lifecycle 1차 안정화** — 새 프로젝트 생성 시 timeline/assets/history 초기화, 프로젝트 로드 시 duration/선택/history 재설정
+- [x] **dirty 1차 연결** — `withHistory()` 기반 편집 액션 후 `isDirty` 설정
+- [x] **타임라인 duration 재계산 누락 수정** — trim/split 후 `duration` 재계산
+- [x] **FFmpeg/ffprobe 실패 상태 확인** — 썸네일 생성/metadata probe에서 non-zero exit 에러 처리
+- [x] **프로젝트 저장 안정화 1차** — JSON 검증 후 임시 파일 write + rename 방식 저장
+- [ ] **Dirty/Undo 적용 범위 완성** — Canvas 드래그, PropertiesPanel 입력, ToolPanel 액션 전체를 `withHistory()`로 통합
+- [ ] **Undo/Redo 후 dirty 정책 정리** — undo/redo 실행 후 저장 필요 상태와 저장 직후 history 정책 결정
+- [ ] **브라우저 개발 모드 Tauri guard** — Vite 브라우저 실행 시 `window.__TAURI__` 부재를 명확히 처리하고 IPC 버튼을 mock/disable
+- [ ] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
+- [ ] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
+- [ ] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결
+- [ ] **번들 코드 스플리팅** — Vite build의 500kB+ 청크 경고 해소를 위해 route/dialog/vendor chunk 분리
+- [ ] **FFmpeg sidecar 배포 검증** — macOS arm64/x64, Windows, Linux별 sidecar 파일명/서명/번들 검증
 
 ---
 
