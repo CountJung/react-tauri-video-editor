@@ -105,13 +105,16 @@ function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
 
   // 미저장 경고 다이얼로그
   const [warnOpen, setWarnOpen] = useState(false)
+  const [warnConfirmLabel, setWarnConfirmLabel] = useState('저장하지 않고 계속')
   const pendingActionRef = useRef<(() => void) | null>(null)
+  const allowNextCloseRef = useRef(false)
 
   /** isDirty가 true이면 경고 다이얼로그를 표시한다. false이면 즉시 실행한다. */
   const guardDirty = useCallback(
-    (action: () => void) => {
+    (action: () => void, confirmLabel = '저장하지 않고 계속') => {
       if (isDirty) {
         pendingActionRef.current = action
+        setWarnConfirmLabel(confirmLabel)
         setWarnOpen(true)
       } else {
         action()
@@ -128,6 +131,7 @@ function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
 
   const handleWarnCancel = useCallback(() => {
     setWarnOpen(false)
+    setWarnConfirmLabel('저장하지 않고 계속')
     pendingActionRef.current = null
   }, [])
 
@@ -204,9 +208,14 @@ function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
   useEffect(() => {
     let cleanup: (() => void) | null = null
     tauriOnCloseRequested((event) => {
+      if (allowNextCloseRef.current) return
       if (useProjectStore.getState().isDirty) {
         event.preventDefault()
-        pendingActionRef.current = () => void tauriCloseWindow()
+        pendingActionRef.current = () => {
+          allowNextCloseRef.current = true
+          void tauriCloseWindow()
+        }
+        setWarnConfirmLabel('저장하지 않고 종료')
         setWarnOpen(true)
       }
     }).then((unlisten) => {
@@ -392,6 +401,7 @@ function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
         defaultHeight={180}
         minWidth={300}
         minHeight={140}
+        storageKey="unsaved-changes-dialog"
       >
         <Box sx={{ p: 2 }}>
           <Typography sx={{ mb: 2 }}>
@@ -402,7 +412,7 @@ function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
               취소
             </Button>
             <Button variant="contained" color="warning" size="small" onClick={handleWarnConfirm}>
-              저장하지 않고 계속
+              {warnConfirmLabel}
             </Button>
           </Box>
         </Box>

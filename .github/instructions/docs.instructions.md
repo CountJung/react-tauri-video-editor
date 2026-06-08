@@ -21,6 +21,11 @@ applyTo: "docs/**,AGENTS.md,.github/**"
 | `.github/skills/*/SKILL.md` | 도메인별 상세 패턴 | 해당 도메인 패턴 변경 |
 | `.github/instructions/*.md` | 파일 범위별 자동 지침 | 지침 내용 변경 |
 
+## Codex 호환 규칙
+
+- `.github/**` 아래 Copilot 지침·스킬을 수정할 때는 Codex가 루트 `AGENTS.md`를 통해 같은 내용을 수동 적용할 수 있는지 확인한다.
+- Copilot 전용 자동화(`applyTo`, 커스텀 에이전트, Chat 명령)를 추가·변경하면 `AGENTS.md`에 Codex 대체 절차도 함께 기록한다.
+
 ## 문서 업데이트 규칙
 
 1. Rust command 추가/변경 → `tauri-backend` SKILL.md + `docs/project-map.md`
@@ -29,7 +34,7 @@ applyTo: "docs/**,AGENTS.md,.github/**"
 4. Timeline/Track/Clip 구조 변경 → `timeline-editor` SKILL.md
 5. FFmpeg 명령 패턴·진행률 이벤트 변경 → `ffmpeg-integration` SKILL.md
 6. UI 레이아웃·상태 보존 패턴 변경 → `ui-conventions` SKILL.md
-7. 핵심 규칙 변경 → `AGENTS.md` + `.github/copilot-instructions.md`
+7. 핵심 규칙·Codex 적용 방식 변경 → `AGENTS.md` + `.github/copilot-instructions.md`
 8. 빌드·배포 절차 변경 → `docs/Guide.md`
 
 ## MD 다이어그램 규칙
@@ -37,3 +42,4 @@ applyTo: "docs/**,AGENTS.md,.github/**"
 - Unicode 박스 문자(┌─│ 등)와 한글을 같은 고정폭 박스 안에 혼용 금지.
 - 아키텍처 다이어그램은 **Mermaid** 또는 ASCII 전용(`+`, `-`, `|`) 박스 사용.
 - 트리(`├─`, `└─`) 구조에서 한글 라벨은 허용.
+

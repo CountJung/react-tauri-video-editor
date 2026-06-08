@@ -29,6 +29,21 @@ React + Tauri 기반 데스크톱 비디오 에디터.
 
 ---
 
+## Codex 적용 방식
+
+이 저장소의 GitHub Copilot 지침·스킬은 Codex에서도 같은 효과를 내도록 **공통 지침 원천**으로 사용한다. Codex/OpenAI 기반 에이전트는 `AGENTS.md`를 진입점으로 삼고, 작업 전 아래 파일을 수동으로 적용한다.
+
+1. 항상 `.github/copilot-instructions.md`를 공통 핵심 지침으로 확인한다.
+2. 수정 대상 경로가 `.github/instructions/*.instructions.md`의 `applyTo` 범위에 걸리면 해당 파일을 함께 확인한다.
+3. 작업 도메인에 맞는 `.github/skills/**/SKILL.md`를 먼저 읽고, 그 절차·금지사항·검증 기준을 따른다.
+4. React Flow 작업은 `.agents/skills/react-flow/SKILL.md`와 필요 reference를 확인한다.
+5. 코드 리뷰·오류 수정 요청은 `.github/agents/code-review.agent.md`를 Codex용 체크리스트로 사용한다.
+6. 새 라우트·새 Tauri command 스캐폴딩 작업은 `.github/prompts/*.prompt.md` 템플릿을 참조한다.
+
+Copilot 전용 표현(예: `applyTo` 자동 적용, Copilot Chat 명령, 커스텀 에이전트 호출)은 Codex에서 직접 실행되지 않을 수 있다. 이 경우 같은 의도를 Codex 도구로 수행한다. 예를 들어 `applyTo`는 파일 경로 기준 수동 매칭으로, Code Review 에이전트는 체크리스트 기반 자체 리뷰로, `/graphify`는 `graphify-out/GRAPH_REPORT.md` 존재 여부 확인으로 대체한다.
+
+---
+
 ## 기술 스택
 
 | 레이어 | 기술 |
@@ -99,9 +114,13 @@ cargo clippy      # Rust lint
 | react-best-practices | `.github/skills/react-best-practices/SKILL.md` |
 | react-flow | `.agents/skills/react-flow/SKILL.md` |
 
+> Codex는 `.github/skills/`를 자동 로드하지 않으므로, 관련 파일을 수정하기 전에 위 표의 스킬을 직접 읽고 적용한다.
+
 ---
 
 ## 자동 지침 파일
+
+GitHub Copilot은 `applyTo`로 자동 적용하고, Codex는 수정 대상 경로와 아래 표를 직접 대조해 해당 파일을 읽는다.
 
 | 파일 | 적용 범위 |
 |---|---|

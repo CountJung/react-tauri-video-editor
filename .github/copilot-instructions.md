@@ -1,6 +1,6 @@
 # Video Editor (React + Tauri) — AI Agent Instructions
 
-> 이 파일은 **핵심 규칙만 포함**합니다. 도메인별 상세 지침은 `.github/skills/` 아래 스킬 파일을 참조하세요.
+> 이 파일은 **GitHub Copilot과 Codex가 함께 사용하는 공통 핵심 지침**입니다. 도메인별 상세 지침은 `.github/skills/` 아래 스킬 파일을 참조하세요. Codex는 루트 `AGENTS.md`를 진입점으로 삼아 이 파일과 관련 `instructions`/`skills`를 수동 적용합니다.
 
 ---
 
@@ -83,14 +83,14 @@
 
 ## 자동 지침 파일 (파일 범위별 적용)
 
-VS Code / GitHub Copilot은 `applyTo` 글로브에 해당하는 파일 편집 시 아래 지침을 자동 적용한다.
+VS Code / GitHub Copilot은 `applyTo` 글로브에 해당하는 파일 편집 시 아래 지침을 자동 적용한다. Codex는 `applyTo`를 자동 해석하지 않으므로, 수정 대상 파일 경로와 아래 표를 직접 대조하여 해당 지침 파일을 읽고 적용한다.
 
 | 지침 파일 | 적용 범위 | 내용 |
 |---|---|---|
 | `backend.instructions.md` | `src-tauri/**` | Rust command, FFmpeg, 파일시스템 규칙 |
 | `ui.instructions.md` | `src/components/**`, `src/routes/**` | Timeline, Preview, ResizableDialog, IPC 호출 |
-| `timeline.instructions.md` | `src/components/timeline/**` | Track/Clip DnD, 상태 패턴, snap 규칙 |
-| `asset.instructions.md` | `src/components/assets/**` | 에셋 패널, 파일 드롭, 메타데이터 |
+| `charts.instructions.md` (Timeline) | `src/components/timeline/**` | Track/Clip DnD, 상태 패턴, snap 규칙 |
+| `tables.instructions.md` (Assets) | `src/components/assets/**` | 에셋 패널, 파일 드롭, 메타데이터 |
 | `docs.instructions.md` | `docs/**`, `AGENTS.md`, `.github/**` | 문서 동기화 규칙, MD 다이어그램 |
 
 ---
@@ -105,6 +105,8 @@ VS Code / GitHub Copilot은 `applyTo` 글로브에 해당하는 파일 편집 �
 ---
 
 ## 커스텀 에이전트
+
+Copilot에서는 커스텀 에이전트로 호출하고, Codex에서는 같은 파일을 코드 리뷰 체크리스트로 읽어 적용한다.
 
 | 에이전트 | 용도 | 경로 |
 |---|---|---|
@@ -166,6 +168,8 @@ VS Code / GitHub Copilot은 `applyTo` 글로브에 해당하는 파일 편집 �
 ---
 
 ## graphify
+
+Codex에서도 동일하게 적용한다: 저장소 구조·아키텍처 질문이나 관련 코드 수정 전 `graphify-out/GRAPH_REPORT.md`가 있으면 먼저 읽는다. 없거나 stale이면 관련 소스/문서를 직접 확인한다.
 
 For any question about this repo's architecture, structure, components, or how to add/modify/find
 code, your **first tool call must be** to read `graphify-out/GRAPH_REPORT.md` (if it exists).
