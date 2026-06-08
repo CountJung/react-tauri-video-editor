@@ -282,3 +282,38 @@ Windows에서는 `node scripts/setup-windows.mjs`가 다음 형태로 자동 치
 - CARGO_TARGET_DIR이 `%USERPROFILE%\.cache\...`로 설정되어 있으므로 내부 드라이브에 빌드됨
 
 `.vscode/tasks.json`의 공통 task는 macOS/Linux 기본값으로 `${env:HOME}`을 사용하되, Windows override에서 `${env:USERPROFILE}` 기반 `CARGO_TARGET_DIR`을 지정한다.
+
+---
+
+## macOS/Windows 공통 VS Code 디버깅
+
+이 프로젝트는 macOS와 Windows 양쪽에서 같은 디버그 흐름을 사용한다.
+
+### 공통 진입점
+
+- VS Code launch config: `Debug Tauri App (macOS)`, `Debug Tauri App (Windows)`
+- preLaunchTask: `start-vite-dev-server`
+- npm script: `pnpm dev:vite:debug`
+- helper: `scripts/vscode-vite-dev.mjs`
+
+### 주소 규칙
+
+- 로컬 디버그 URL은 `http://127.0.0.1:1420`으로 통일한다.
+- `localhost`는 Windows WebView2에서 IPv6 `::1`로 먼저 해석될 수 있어, Vite가 IPv4 loopback에 떠 있을 때 Tauri 창에서 `ERR_CONNECTION_REFUSED`가 날 수 있다.
+- 다음 파일들의 로컬 디버그 주소는 함께 유지한다:
+  - `src-tauri/tauri.conf.json` `build.devUrl`
+  - `.vscode/launch.json` frontend debug URL
+  - `scripts/vscode-vite-dev.mjs` 기본 `VITE_DEV_URL`
+  - `vite.config.ts` server host
+
+### helper 동작
+
+- 먼저 `VITE_DEV_URL`에 HTTP probe를 수행한다.
+- 이미 서버가 있으면 `VITE_READY existing dev server detected`를 출력하고 VS Code background task를 유지한다.
+- 서버가 없으면 Vite를 시작하고 readiness 로그를 감지한 뒤 `VITE_READY started dev server`를 출력한다.
+- Windows에서는 `pnpm.cmd`를 직접 spawn하지 않는다. `shell: false`와 `.cmd` 조합은 `spawn EINVAL`을 일으킬 수 있으므로, `npm_execpath` 또는 `pnpm` 실행명을 통해 cross-platform으로 실행한다.
+- helper가 시작한 서버는 Windows에서 `taskkill /T /F`, macOS/Linux에서 `SIGTERM`으로 정리한다.
+
+### host override
+
+원격 기기나 VM에서 테스트할 때만 `VITE_DEV_URL`과 `TAURI_DEV_HOST`를 함께 지정한다. 한쪽만 바꾸면 helper probe, Vite bind host, Tauri devUrl이 엇갈려 연결 거부가 재발할 수 있다.

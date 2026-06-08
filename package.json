@@ -15,7 +15,8 @@
     "fix": "biome check --write src/",
     "lint": "biome check src/",
     "typecheck": "tsc --noEmit",
-    "dev:vite:vscode": "node scripts/vscode-vite-dev.mjs"
+    "dev:vite:debug": "node scripts/vscode-vite-dev.mjs",
+    "dev:vite:vscode": "pnpm dev:vite:debug"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

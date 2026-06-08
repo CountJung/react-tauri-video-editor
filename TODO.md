@@ -349,7 +349,7 @@
 - [x] **프로젝트 저장/불러오기** — Phase 4-b로 이관 (상세 항목 참조)
 - [x] **macOS AppleDouble 메타데이터 방어** — `._*` 파일이 Biome/Vitest 검증에 섞이지 않도록 ignore 설정 추가
 - [x] **VS Code 디버깅 preLaunchTask 안정화** — Vite 1420 포트가 이미 사용 중이어도 `start-vite-dev-server`가 실패하지 않도록 idempotent helper 추가
+- [x] **크로스플랫폼 디버깅 지침화** — macOS/Windows 공통 Vite helper, 127.0.0.1 devUrl 규칙, 플랫폼별 cleanup 절차를 스크립트와 문서에 명시
 - [x] **미저장 종료 경고 수정** — 창 닫기 시 `저장하지 않고 종료`가 재차 close guard에 막히지 않도록 우회 플래그와 상황별 버튼 라벨 적용
 - [ ] **외장 볼륨 Cargo target 보완** — Tauri permission 생성 중 `._default.toml`이 생기는 환경에서는 `CARGO_TARGET_DIR`를 로컬 디스크로 지정하는 검증 스크립트/문서화 필요
 - [ ] `.github/prompts/` — `new-route.prompt.md`, `new-command.prompt.md` 내용 검토
-

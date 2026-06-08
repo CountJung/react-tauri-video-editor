@@ -1,15 +1,12 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import path from 'node:path'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
-import path from 'path'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
 
 const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
-  plugins: [
-    TanStackRouterVite({ routesDirectory: './src/routes' }),
-    react(),
-  ],
+  plugins: [TanStackRouterVite({ routesDirectory: './src/routes' }), react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -19,10 +16,8 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
-    hmr: host
-      ? { protocol: 'ws', host, port: 1421 }
-      : undefined,
+    host: host || '127.0.0.1',
+    hmr: host ? { protocol: 'ws', host, port: 1421 } : undefined,
     watch: {
       ignored: ['**/src-tauri/**'],
     },
@@ -32,9 +27,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**', '**/._*'],
   },
   build: {
-    target: process.env.TAURI_ENV_PLATFORM === 'windows'
-      ? 'chrome105'
-      : 'safari13',
+    target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
     minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },

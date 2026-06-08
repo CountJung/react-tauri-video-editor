@@ -4,7 +4,7 @@
     {
       "label": "start-vite-dev-server",
       "type": "shell",
-      "command": "pnpm dev:vite:vscode",
+      "command": "pnpm dev:vite:debug",
       "isBackground": true,
       "problemMatcher": {
         "owner": "vite",

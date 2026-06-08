@@ -93,12 +93,22 @@ src-tauri/
 
 ```bash
 pnpm dev          # Tauri 개발 모드 (Rust 빌드 포함)
+pnpm dev:vite:debug # VS Code 디버깅용 Vite helper (macOS/Windows 공통)
 pnpm build        # 릴리즈 빌드
 pnpm test         # Vitest
 pnpm fix          # Biome 자동 포맷/린트
 cargo check       # Rust 컴파일 확인 (src-tauri/ 내에서)
 cargo clippy      # Rust lint
 ```
+
+### 크로스플랫폼 디버깅 원칙
+
+- VS Code의 macOS/Windows Tauri 디버그 설정은 모두 `start-vite-dev-server` preLaunchTask를 사용한다.
+- preLaunchTask는 `pnpm dev:vite:debug` → `scripts/vscode-vite-dev.mjs`를 실행한다.
+- 디버그용 dev server 주소는 `http://127.0.0.1:1420`으로 통일한다. `localhost`는 Windows WebView2에서 IPv6/IPv4 해석 차이로 연결 거부가 날 수 있으므로 사용하지 않는다.
+- Vite 포트 `1420`은 `strictPort`로 고정한다. 포트가 이미 사용 중이면 helper가 기존 서버를 감지해 `VITE_READY`를 출력하고, 없으면 새로 시작한다.
+- macOS/Linux는 `SIGTERM`, Windows는 `taskkill /T /F`로 helper가 시작한 Vite 프로세스 트리를 정리한다.
+- 원격/외부 기기 테스트처럼 host를 바꿔야 할 때만 `VITE_DEV_URL`과 `TAURI_DEV_HOST`를 함께 지정한다. 로컬 VS Code 디버깅 기본값은 바꾸지 않는다.
 
 ---
 

@@ -34,6 +34,8 @@ applyTo: "src-tauri/**"
 
 - 경로·설정 값 **하드코딩 금지** — `.env` → `std::env::var` 사용.
 - 새 ENV 키 추가 시 `docs/project-map.md` 환경변수 맵도 업데이트.
+- Tauri 로컬 디버그 `devUrl`은 `http://127.0.0.1:1420`을 유지한다. `localhost`는 Windows WebView2에서 연결 거부를 유발할 수 있으므로 기본값으로 되돌리지 않는다.
+- VS Code 디버그 서버는 `start-vite-dev-server` → `pnpm dev:vite:debug` → `scripts/vscode-vite-dev.mjs` 흐름을 사용한다. devUrl/host 변경 시 `AGENTS.md`, `.github/copilot-instructions.md`, `docs/Guide.md`, `tauri-backend` 스킬을 함께 동기화한다.
 
 ## 5. 이벤트 (Tauri emit)
 
