@@ -266,7 +266,8 @@ interface TimelineActions {
     trackId: string,
     startSec: number,
     duration: number,
-    props?: Partial<TextProps>
+    props?: Partial<TextProps>,
+    placement?: Partial<Pick<Clip, 'x' | 'y' | 'width' | 'height'>>
   ) => void
   addShapeClip: (
     trackId: string,
@@ -451,7 +452,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
 
   // ── 텍스트 & 도형 클립 ───────────────────────────────────────────────────
 
-  addTextClip: (trackId, startSec, duration, props) =>
+  addTextClip: (trackId, startSec, duration, props, placement) =>
     set((state) => {
       const snap = snapToGrid(Math.max(0, startSec), state.snapInterval)
       const defaultText: TextProps = {
@@ -472,10 +473,10 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         trimStart: 0,
         trimEnd: duration,
         clipType: 'text',
-        x: state.canvasWidth / 4,
-        y: state.canvasHeight - 200,
-        width: state.canvasWidth / 2,
-        height: 120,
+        x: placement?.x ?? state.canvasWidth / 4,
+        y: placement?.y ?? state.canvasHeight - 200,
+        width: placement?.width ?? state.canvasWidth / 2,
+        height: placement?.height ?? 120,
         rotation: 0,
         opacity: 1,
         fitMode: 'fit',
@@ -484,7 +485,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
       const newTracks = state.tracks.map((t) =>
         t.id === trackId ? { ...t, clips: resolveCollisions([...t.clips, clip]) } : t
       )
-      return { tracks: newTracks, duration: calcDuration(newTracks) }
+      return { tracks: newTracks, duration: calcDuration(newTracks), selectedClipId: clip.id }
     }),
 
   addShapeClip: (trackId, startSec, duration, shapeType, x, y, w, h) =>
@@ -510,7 +511,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
       const newTracks = state.tracks.map((t) =>
         t.id === trackId ? { ...t, clips: resolveCollisions([...t.clips, clip]) } : t
       )
-      return { tracks: newTracks, duration: calcDuration(newTracks) }
+      return { tracks: newTracks, duration: calcDuration(newTracks), selectedClipId: clip.id }
     }),
 
   // ── Canvas 변환 ──────────────────────────────────────────────────────────

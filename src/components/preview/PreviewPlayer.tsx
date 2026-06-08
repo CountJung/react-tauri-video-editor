@@ -1,13 +1,18 @@
+import { withHistory } from '@/lib/withHistory'
 import { useAssetStore } from '@/store/assetStore'
-import type { Clip } from '@/store/timelineStore'
+import type { Clip, ShapeType } from '@/store/timelineStore'
 import { useTimelineStore } from '@/store/timelineStore'
+import { useToolStore } from '@/store/toolStore'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Slider from '@mui/material/Slider'
+import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ResizableDialog } from '../common/ResizableDialog'
 import {
   collectActiveLayers,
   drawImageLike,
@@ -51,6 +56,67 @@ function drawSelection(ctx: CanvasRenderingContext2D, clip: Clip): void {
   ctx.restore()
 }
 
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+
+const HANDLE_SIZE = 18
+const MIN_OBJECT_SIZE = 16
+
+function findTrackId(
+  tracks: ReturnType<typeof useTimelineStore.getState>['tracks'],
+  type: string
+): string | null {
+  return tracks.find((track) => track.type === type)?.id ?? null
+}
+
+function getResizeHandle(clip: Clip, x: number, y: number): ResizeHandle | null {
+  const half = HANDLE_SIZE / 2
+  const handles: Array<{ handle: ResizeHandle; x: number; y: number }> = [
+    { handle: 'nw', x: clip.x, y: clip.y },
+    { handle: 'n', x: clip.x + clip.width / 2, y: clip.y },
+    { handle: 'ne', x: clip.x + clip.width, y: clip.y },
+    { handle: 'e', x: clip.x + clip.width, y: clip.y + clip.height / 2 },
+    { handle: 'se', x: clip.x + clip.width, y: clip.y + clip.height },
+    { handle: 's', x: clip.x + clip.width / 2, y: clip.y + clip.height },
+    { handle: 'sw', x: clip.x, y: clip.y + clip.height },
+    { handle: 'w', x: clip.x, y: clip.y + clip.height / 2 },
+  ]
+  return handles.find((p) => Math.abs(x - p.x) <= half && Math.abs(y - p.y) <= half)?.handle ?? null
+}
+
+function isRotationHandle(clip: Clip, x: number, y: number): boolean {
+  const rx = clip.x + clip.width / 2
+  const ry = clip.y - 38
+  return Math.hypot(x - rx, y - ry) <= 18
+}
+
+function resizeClipRect(clip: Clip, handle: ResizeHandle, dx: number, dy: number) {
+  let { x, y, width, height } = clip
+  if (handle.includes('w')) {
+    x += dx
+    width -= dx
+  }
+  if (handle.includes('e')) width += dx
+  if (handle.includes('n')) {
+    y += dy
+    height -= dy
+  }
+  if (handle.includes('s')) height += dy
+  if (width < MIN_OBJECT_SIZE) {
+    if (handle.includes('w')) x -= MIN_OBJECT_SIZE - width
+    width = MIN_OBJECT_SIZE
+  }
+  if (height < MIN_OBJECT_SIZE) {
+    if (handle.includes('n')) y -= MIN_OBJECT_SIZE - height
+    height = MIN_OBJECT_SIZE
+  }
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.round(width),
+    height: Math.round(height),
+  }
+}
+
 /** Phase 5 — Canvas 기반 합성 프리뷰 플레이어 */
 export function PreviewPlayer() {
   const assets = useAssetStore((s) => s.assets)
@@ -61,7 +127,16 @@ export function PreviewPlayer() {
   const canvasWidth = useTimelineStore((s) => s.canvasWidth)
   const canvasHeight = useTimelineStore((s) => s.canvasHeight)
   const selectedClipId = useTimelineStore((s) => s.selectedClipId)
-  const { setPlaying, setCurrentTime, selectClip, updateClipCanvas } = useTimelineStore()
+  const activeTool = useToolStore((s) => s.activeTool)
+  const {
+    setPlaying,
+    setCurrentTime,
+    selectClip,
+    updateClipCanvas,
+    addTextClip,
+    addShapeClip,
+    splitClip,
+  } = useTimelineStore()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number | null>(null)
@@ -72,15 +147,29 @@ export function PreviewPlayer() {
   const videoCacheRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const dragRef = useRef<{
+    mode: 'move' | 'resize' | 'rotate'
     clipId: string
     startX: number
     startY: number
-    clipX: number
-    clipY: number
+    clip: Clip
+    handle?: ResizeHandle
+    historyLabel: string
+    historyPushed: boolean
+  } | null>(null)
+  const draftShapeRef = useRef<{ shapeType: ShapeType; startX: number; startY: number } | null>(
+    null
+  )
+  const draftCropRef = useRef<{
+    clip: Clip
+    assetWidth: number
+    assetHeight: number
+    startX: number
+    startY: number
   } | null>(null)
 
   const [localCurrentTime, setLocalCurrentTime] = useState(0)
   const [isSliderDragging, setIsSliderDragging] = useState(false)
+  const [textDialog, setTextDialog] = useState<{ clipId: string; text: string } | null>(null)
 
   useEffect(() => {
     currentTimeRef.current = storeCurrentTime
@@ -231,39 +320,175 @@ export function PreviewPlayer() {
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       const point = canvasPoint(event)
       const hit = hitTestLayers(activeLayers, point.x, point.y)
+      const state = useTimelineStore.getState()
+
+      if (activeTool === 'text') {
+        const trackId = findTrackId(state.tracks, 'text')
+        if (!trackId) return
+        withHistory('텍스트 클립 추가', () =>
+          addTextClip(
+            trackId,
+            state.currentTime,
+            5,
+            { text: '텍스트를 입력하세요' },
+            { x: Math.round(point.x - 300), y: Math.round(point.y - 60), width: 600, height: 120 }
+          )
+        )
+        const clipId = useTimelineStore.getState().selectedClipId
+        if (clipId) setTextDialog({ clipId, text: '텍스트를 입력하세요' })
+        return
+      }
+
+      if (activeTool === 'rect' || activeTool === 'circle' || activeTool === 'arrow') {
+        draftShapeRef.current = { shapeType: activeTool, startX: point.x, startY: point.y }
+        event.currentTarget.setPointerCapture(event.pointerId)
+        return
+      }
+
+      if (activeTool === 'razor') {
+        if (!hit) return
+        withHistory('클립 분할', () => splitClip(hit.id, state.currentTime))
+        selectClip(hit.id)
+        return
+      }
+
+      if (activeTool === 'crop') {
+        if (!hit || hit.clipType !== 'media') return
+        const layer = activeLayers.find((candidate) => candidate.clip.id === hit.id)
+        const asset = layer?.asset
+        if (!asset || asset.type === 'audio') return
+        selectClip(hit.id)
+        draftCropRef.current = {
+          clip: hit,
+          assetWidth: asset.width || hit.width,
+          assetHeight: asset.height || hit.height,
+          startX: point.x,
+          startY: point.y,
+        }
+        event.currentTarget.setPointerCapture(event.pointerId)
+        return
+      }
+
       selectClip(hit?.id ?? null)
       if (hit) {
+        const selectedHandle =
+          selectedClipId === hit.id ? getResizeHandle(hit, point.x, point.y) : null
+        const mode =
+          selectedClipId === hit.id && isRotationHandle(hit, point.x, point.y)
+            ? 'rotate'
+            : selectedHandle
+              ? 'resize'
+              : 'move'
+        const historyLabel =
+          mode === 'move'
+            ? '캔버스 오브젝트 이동'
+            : mode === 'resize'
+              ? '캔버스 오브젝트 크기 변경'
+              : '캔버스 오브젝트 회전'
         dragRef.current = {
+          mode,
           clipId: hit.id,
           startX: point.x,
           startY: point.y,
-          clipX: hit.x,
-          clipY: hit.y,
+          clip: hit,
+          handle: selectedHandle ?? undefined,
+          historyLabel,
+          historyPushed: false,
         }
         event.currentTarget.setPointerCapture(event.pointerId)
       }
     },
-    [activeLayers, canvasPoint, selectClip]
+    [activeLayers, activeTool, addTextClip, canvasPoint, selectClip, selectedClipId, splitClip]
   )
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!dragRef.current) return
       const point = canvasPoint(event)
-      const drag = dragRef.current
-      updateClipCanvas(drag.clipId, {
-        x: Math.round(drag.clipX + point.x - drag.startX),
-        y: Math.round(drag.clipY + point.y - drag.startY),
-      })
+
+      if (dragRef.current) {
+        const drag = dragRef.current
+        if (!drag.historyPushed && Math.hypot(point.x - drag.startX, point.y - drag.startY) >= 1) {
+          withHistory(drag.historyLabel, () => undefined)
+          drag.historyPushed = true
+        }
+        if (drag.mode === 'move') {
+          updateClipCanvas(drag.clipId, {
+            x: Math.round(drag.clip.x + point.x - drag.startX),
+            y: Math.round(drag.clip.y + point.y - drag.startY),
+          })
+        } else if (drag.mode === 'resize' && drag.handle) {
+          updateClipCanvas(
+            drag.clipId,
+            resizeClipRect(drag.clip, drag.handle, point.x - drag.startX, point.y - drag.startY)
+          )
+        } else if (drag.mode === 'rotate') {
+          const cx = drag.clip.x + drag.clip.width / 2
+          const cy = drag.clip.y + drag.clip.height / 2
+          const radians = Math.atan2(point.y - cy, point.x - cx) + Math.PI / 2
+          updateClipCanvas(drag.clipId, { rotation: Math.round((radians * 180) / Math.PI) })
+        }
+      }
     },
     [canvasPoint, updateClipCanvas]
   )
 
-  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
-    dragRef.current = null
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
-      event.currentTarget.releasePointerCapture(event.pointerId)
-  }, [])
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      const point = canvasPoint(event)
+      const state = useTimelineStore.getState()
+
+      if (draftShapeRef.current) {
+        const draft = draftShapeRef.current
+        draftShapeRef.current = null
+        const x = Math.min(draft.startX, point.x)
+        const y = Math.min(draft.startY, point.y)
+        const width = Math.abs(point.x - draft.startX)
+        const height = Math.abs(point.y - draft.startY)
+        const trackId = findTrackId(state.tracks, 'shape')
+        if (trackId && width >= MIN_OBJECT_SIZE && height >= MIN_OBJECT_SIZE) {
+          withHistory('도형 클립 추가', () =>
+            addShapeClip(
+              trackId,
+              state.currentTime,
+              5,
+              draft.shapeType,
+              Math.round(x),
+              Math.round(y),
+              Math.round(width),
+              Math.round(height)
+            )
+          )
+        }
+      }
+
+      if (draftCropRef.current) {
+        const draft = draftCropRef.current
+        draftCropRef.current = null
+        const cropX = Math.max(0, Math.min(draft.startX, point.x) - draft.clip.x)
+        const cropY = Math.max(0, Math.min(draft.startY, point.y) - draft.clip.y)
+        const cropW = Math.min(draft.clip.width - cropX, Math.abs(point.x - draft.startX))
+        const cropH = Math.min(draft.clip.height - cropY, Math.abs(point.y - draft.startY))
+        if (cropW >= MIN_OBJECT_SIZE && cropH >= MIN_OBJECT_SIZE) {
+          withHistory('클립 자르기', () =>
+            updateClipCanvas(draft.clip.id, {
+              fitMode: 'crop',
+              cropRect: {
+                x: Math.round((cropX / draft.clip.width) * draft.assetWidth),
+                y: Math.round((cropY / draft.clip.height) * draft.assetHeight),
+                width: Math.round((cropW / draft.clip.width) * draft.assetWidth),
+                height: Math.round((cropH / draft.clip.height) * draft.assetHeight),
+              },
+            })
+          )
+        }
+      }
+
+      dragRef.current = null
+      if (event.currentTarget.hasPointerCapture(event.pointerId))
+        event.currentTarget.releasePointerCapture(event.pointerId)
+    },
+    [addShapeClip, canvasPoint, updateClipCanvas]
+  )
 
   const handleSliderChange = useCallback((_: Event, value: number | number[]) => {
     const time = Array.isArray(value) ? value[0] : value
@@ -397,6 +622,68 @@ export function PreviewPlayer() {
           )}
         </Box>
       </Box>
+
+      <ResizableDialog
+        open={Boolean(textDialog)}
+        onClose={() => setTextDialog(null)}
+        dialogTitle="텍스트 편집"
+        defaultWidth={420}
+        defaultHeight={220}
+        minWidth={320}
+        minHeight={180}
+        storageKey="preview-text-editor-dialog"
+      >
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <TextField
+            label="텍스트"
+            multiline
+            minRows={3}
+            value={textDialog?.text ?? ''}
+            onChange={(event) =>
+              setTextDialog((current) =>
+                current ? { ...current, text: event.target.value } : current
+              )
+            }
+            fullWidth
+            autoFocus
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button size="small" variant="outlined" onClick={() => setTextDialog(null)}>
+              취소
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => {
+                if (textDialog) {
+                  withHistory('텍스트 내용 변경', () =>
+                    updateClipCanvas(textDialog.clipId, {
+                      textProps: {
+                        ...(useTimelineStore
+                          .getState()
+                          .tracks.flatMap((track) => track.clips)
+                          .find((clip) => clip.id === textDialog.clipId)?.textProps ?? {
+                          text: '',
+                          fontFamily: 'sans-serif',
+                          fontSize: 72,
+                          color: '#ffffff',
+                          bold: false,
+                          italic: false,
+                          align: 'center',
+                        }),
+                        text: textDialog.text,
+                      },
+                    })
+                  )
+                }
+                setTextDialog(null)
+              }}
+            >
+              적용
+            </Button>
+          </Box>
+        </Box>
+      </ResizableDialog>
     </Box>
   )
 }

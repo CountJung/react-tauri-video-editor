@@ -212,7 +212,7 @@
 - [x] **PropertiesPanel** — 우측 속성 사이드바 컴포넌트 (`src/components/properties/PropertiesPanel.tsx`)
   - [x] EditorLayout 우측에 배치 (기본 너비 240px, LayoutResizer로 리사이즈)
   - [x] `useStickyState`로 패널 너비 영구 저장
-  - [ ] 열기/닫기 토글 버튼 (GlobalAppBar 또는 오른쪽 엣지)
+  - [x] 열기/닫기 토글 버튼 (GlobalAppBar 또는 오른쪽 엣지)
 - [x] **PropertiesPanel — 도구별 옵션 패널** — 활성 도구에 따라 동적으로 내용 변경 (기본 UI 구현)
   - **공통 클립 속성** (Select 도구 + 클립 선택 시)
     - 위치 `x, y` 수치 입력 (px)
@@ -248,13 +248,13 @@
   - **Razor 도구 안내**
     - 현재 플레이헤드 위치 표시
     - "클립을 클릭하면 현재 위치에서 분할됩니다" 안내 텍스트
-- [ ] **Select 도구** — Canvas 오브젝트 클릭 선택 + 이동(드래그) + Transform Handles
-- [ ] **Text 도구** — Canvas 클릭 → TextClip 생성 + 인라인 텍스트 에디터 팝업
-- [ ] **Rectangle 도구** — Canvas 드래그로 ShapeClip(rect) 생성
-- [ ] **Circle 도구** — Canvas 드래그로 ShapeClip(circle) 생성
-- [ ] **Arrow 도구** — Canvas 드래그로 ShapeClip(arrow) 생성
-- [ ] **Crop 도구** — 비디오 클립의 표시 영역 자르기 (cropRect 속성)
-- [ ] **Razor 도구** — 클립을 플레이헤드 위치에서 분할 (splitClip 액션)
+- [x] **Select 도구** — Canvas 오브젝트 클릭 선택 + 이동(드래그) + Transform Handles
+- [x] **Text 도구** — Canvas 클릭 → TextClip 생성 + 인라인 텍스트 에디터 팝업
+- [x] **Rectangle 도구** — Canvas 드래그로 ShapeClip(rect) 생성
+- [x] **Circle 도구** — Canvas 드래그로 ShapeClip(circle) 생성
+- [x] **Arrow 도구** — Canvas 드래그로 ShapeClip(arrow) 생성
+- [x] **Crop 도구** — 비디오 클립의 표시 영역 자르기 (cropRect 속성)
+- [x] **Razor 도구** — 클립을 플레이헤드 위치에서 분할 (splitClip 액션)
 
 ---
 
@@ -331,7 +331,7 @@
 - [ ] **브라우저 개발 모드 Tauri guard** — Vite 브라우저 실행 시 `window.__TAURI__` 부재를 명확히 처리하고 IPC 버튼을 mock/disable
 - [ ] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
 - [ ] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
-- [ ] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결
+- [x] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결
 - [ ] **번들 코드 스플리팅** — Vite build의 500kB+ 청크 경고 해소를 위해 route/dialog/vendor chunk 분리
 - [ ] **FFmpeg sidecar 배포 검증** — macOS arm64/x64, Windows, Linux별 sidecar 파일명/서명/번들 검증
 

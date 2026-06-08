@@ -10,5 +10,6 @@ export const STORAGE_KEYS = {
   SETTINGS_SNAP_INTERVAL: 'settings:snapInterval',
   // 프로젝트
   PANEL_PROPERTIES_WIDTH: 'panel:properties:width',
+  PANEL_PROPERTIES_OPEN: 'panel:properties:open',
   RECENT_PROJECTS: 'project:recent',
 } as const

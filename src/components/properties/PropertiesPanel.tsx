@@ -6,9 +6,11 @@ import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined'
 import ContentCutIcon from '@mui/icons-material/ContentCut'
 import CropIcon from '@mui/icons-material/Crop'
 import EastIcon from '@mui/icons-material/East'
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'
 import MouseIcon from '@mui/icons-material/Mouse'
 import RectangleOutlinedIcon from '@mui/icons-material/RectangleOutlined'
 import Box from '@mui/material/Box'
+import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Slider from '@mui/material/Slider'
 import TextField from '@mui/material/TextField'
@@ -430,7 +432,7 @@ const TOOL_META: Record<ToolType, { label: string; Icon: SvgIconComponent }> = {
 // PropertiesPanel (메인)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function PropertiesPanel() {
+export function PropertiesPanel({ onClose }: { onClose?: () => void }) {
   const activeTool = useToolStore((s) => s.activeTool)
   const { label, Icon } = TOOL_META[activeTool]
 
@@ -484,6 +486,16 @@ export function PropertiesPanel() {
         <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 12 }}>
           {label}
         </Typography>
+        <Tooltip title="속성 패널 닫기">
+          <IconButton
+            size="small"
+            onClick={onClose}
+            sx={{ ml: 'auto' }}
+            aria-label="속성 패널 닫기"
+          >
+            <KeyboardArrowRightIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* 내용 */}

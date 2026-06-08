@@ -13,6 +13,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { AssetPanel } from './assets/AssetPanel'
@@ -45,6 +46,7 @@ export function EditorLayout() {
   const [assetWidth, setAssetWidth] = useStickyState(240, STORAGE_KEYS.PANEL_ASSET_WIDTH)
   const [previewHeight, setPreviewHeight] = useStickyState(300, STORAGE_KEYS.PANEL_PREVIEW_HEIGHT)
   const [propsWidth, setPropsWidth] = useStickyState(240, STORAGE_KEYS.PANEL_PROPERTIES_WIDTH)
+  const [propsOpen, setPropsOpen] = useStickyState(true, STORAGE_KEYS.PANEL_PROPERTIES_OPEN)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -139,23 +141,54 @@ export function EditorLayout() {
           </Box>
         </Box>
 
-        <LayoutResizer
-          direction="vertical"
-          onResize={(d) => setPropsWidth((w) => Math.max(180, Math.min(480, w - d)))}
-        />
+        {propsOpen && (
+          <LayoutResizer
+            direction="vertical"
+            onResize={(d) => setPropsWidth((w) => Math.max(180, Math.min(480, w - d)))}
+          />
+        )}
 
         {/* 우측: 속성 패널 (도구별 옵션) */}
-        <Box
-          sx={{
-            width: propsWidth,
-            minWidth: 180,
-            maxWidth: 480,
-            flexShrink: 0,
-            overflow: 'hidden',
-          }}
-        >
-          <PropertiesPanel />
-        </Box>
+        {propsOpen ? (
+          <Box
+            sx={{
+              width: propsWidth,
+              minWidth: 180,
+              maxWidth: 480,
+              flexShrink: 0,
+              overflow: 'hidden',
+            }}
+          >
+            <PropertiesPanel onClose={() => setPropsOpen(false)} />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              width: 28,
+              flexShrink: 0,
+              borderLeft: 1,
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Button
+              size="small"
+              onClick={() => setPropsOpen(true)}
+              sx={{
+                minWidth: 0,
+                width: 24,
+                height: '100%',
+                writingMode: 'vertical-rl',
+                fontSize: 11,
+              }}
+            >
+              속성
+            </Button>
+          </Box>
+        )}
       </Box>
 
       {/* 드래그 중 표시되는 유령 요소 */}
