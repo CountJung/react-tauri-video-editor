@@ -1,0 +1,4 @@
+interface:
+  display_name: "Memory Leak Review Agent"
+  short_description: "Review React, Tauri, media, and Rust cleanup paths."
+  default_prompt: "Use $memory-leak-review-agent to inspect suspected React, Tauri, media cache, sidecar, or Rust resource leaks and propose or apply narrow cleanup fixes."

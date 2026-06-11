@@ -91,6 +91,10 @@
 | **react-best-practices** | React 성능 최적화, 리렌더 방지, 비동기 패턴 | `.github/skills/react-best-practices/SKILL.md` |
 | **react-flow** | React Flow 커스텀 노드/엣지, 캔버스 상호작용 | `.agents/skills/react-flow/SKILL.md` |
 
+### Codex 로컬 에이전트 스킬
+
+`reference/skills`의 에이전트형 스킬은 이 React + Tauri + Rust 프로젝트에 맞는 리뷰 계열만 `.agents/skills/<skill>/agents/openai.yaml` 구조로 설치한다. C++/OpenCV/WebView2 LAN 전용 스킬은 설치하지 않는다. 사용자가 `$code-review-agent`, `$security-review-agent`처럼 명시 호출하면 Codex는 해당 `.agents/skills/<skill>/SKILL.md`를 먼저 읽고, 현재 프로젝트의 `AGENTS.md`/`TODO.md`/관련 지침과 충돌하지 않는 범위에서 적용한다.
+
 ---
 
 ## 자동 지침 파일 (파일 범위별 적용)

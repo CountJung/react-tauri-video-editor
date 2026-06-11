@@ -1,3 +1,4 @@
+import { withHistory } from '@/lib/withHistory'
 import { useTimelineStore } from '@/store/timelineStore'
 import { type ToolType, useToolStore } from '@/store/toolStore'
 import type { SvgIconComponent } from '@mui/icons-material'
@@ -19,6 +20,31 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import type React from 'react'
+
+const SYSTEM_FONTS = [
+  'Arial',
+  'Segoe UI',
+  'Roboto',
+  'Helvetica',
+  'Noto Sans KR',
+  'Malgun Gothic',
+  'Apple SD Gothic Neo',
+  'Georgia',
+  'Times New Roman',
+  'Courier New',
+  'monospace',
+  'sans-serif',
+]
+
+const FALLBACK_TEXT_PROPS = {
+  text: '',
+  fontFamily: 'sans-serif',
+  fontSize: 72,
+  color: '#ffffff',
+  bold: false,
+  italic: false,
+  align: 'center' as const,
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 헬퍼
@@ -88,6 +114,43 @@ function NumInput({
       sx={{ '& .MuiOutlinedInput-root': { fontSize: 12 } }}
       fullWidth
     />
+  )
+}
+
+function ColorInput({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const colorValue = /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box
+        component="input"
+        type="color"
+        value={colorValue}
+        onChange={(event) => onChange(event.target.value)}
+        sx={{
+          width: 28,
+          height: 24,
+          border: 'none',
+          borderRadius: 0.5,
+          cursor: 'pointer',
+          p: 0,
+          bgcolor: 'transparent',
+        }}
+      />
+      <TextField
+        size="small"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
+        sx={{ flex: 1 }}
+      />
+    </Box>
   )
 }
 
@@ -202,46 +265,80 @@ function SelectPanel() {
 }
 
 function TextPanel() {
+  const selectedClipId = useTimelineStore((s) => s.selectedClipId)
+  const tracks = useTimelineStore((s) => s.tracks)
+  const updateClipCanvas = useTimelineStore((s) => s.updateClipCanvas)
+
+  const clip = selectedClipId
+    ? tracks.flatMap((track) => track.clips).find((candidate) => candidate.id === selectedClipId)
+    : null
+
+  if (!clip || clip.clipType !== 'text') {
+    return (
+      <Box sx={{ px: 1.5, py: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          캔버스에서 텍스트 클립을 선택하세요.
+        </Typography>
+      </Box>
+    )
+  }
+
+  const textProps = clip.textProps ?? FALLBACK_TEXT_PROPS
+  const updateText = (label: string, update: Partial<typeof textProps>) => {
+    withHistory(label, () =>
+      updateClipCanvas(clip.id, {
+        textProps: {
+          ...textProps,
+          ...update,
+        },
+      })
+    )
+  }
+
   return (
     <>
       <SectionTitle>텍스트 속성</SectionTitle>
       <Row label="폰트">
         <TextField
           size="small"
-          defaultValue="Sans-Serif"
+          select
+          value={textProps.fontFamily}
+          onChange={(event) => updateText('텍스트 폰트 변경', { fontFamily: event.target.value })}
           inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
           fullWidth
-        />
+        >
+          {SYSTEM_FONTS.map((font) => (
+            <MenuItem key={font} value={font} sx={{ fontFamily: font }}>
+              {font}
+            </MenuItem>
+          ))}
+        </TextField>
       </Row>
       <Row label="크기">
-        <NumInput value={48} min={8} max={512} onChange={() => {}} unit="px" />
+        <NumInput
+          value={textProps.fontSize}
+          min={8}
+          max={512}
+          onChange={(value) => updateText('텍스트 크기 변경', { fontSize: value })}
+          unit="px"
+        />
       </Row>
       <Row label="색상">
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box
-            component="input"
-            type="color"
-            defaultValue="#ffffff"
-            sx={{
-              width: 28,
-              height: 24,
-              border: 'none',
-              borderRadius: 0.5,
-              cursor: 'pointer',
-              p: 0,
-            }}
-          />
-          <TextField
-            size="small"
-            defaultValue="#ffffff"
-            inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
-            sx={{ flex: 1 }}
-          />
-        </Box>
+        <ColorInput
+          value={textProps.color}
+          onChange={(value) => updateText('텍스트 색상 변경', { color: value })}
+        />
       </Row>
       <Row label="스타일">
         <ToggleButtonGroup
           size="small"
+          value={[...(textProps.bold ? ['bold'] : []), ...(textProps.italic ? ['italic'] : [])]}
+          onChange={(_, values) =>
+            updateText('텍스트 스타일 변경', {
+              bold: (values as string[]).includes('bold'),
+              italic: (values as string[]).includes('italic'),
+            })
+          }
           sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 0.75, fontSize: 12 } }}
         >
           <ToggleButton value="bold">
@@ -250,14 +347,16 @@ function TextPanel() {
           <ToggleButton value="italic">
             <em>I</em>
           </ToggleButton>
-          <ToggleButton value="underline">
-            <u>U</u>
-          </ToggleButton>
         </ToggleButtonGroup>
       </Row>
       <Row label="정렬">
         <ToggleButtonGroup
+          exclusive
           size="small"
+          value={textProps.align}
+          onChange={(_, value) => {
+            if (value) updateText('텍스트 정렬 변경', { align: value })
+          }}
           sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 0.75, fontSize: 11 } }}
         >
           <ToggleButton value="left">좌</ToggleButton>
@@ -265,77 +364,103 @@ function TextPanel() {
           <ToggleButton value="right">우</ToggleButton>
         </ToggleButtonGroup>
       </Row>
-      <Box sx={{ px: 1.5, pt: 0.5 }}>
-        <Typography variant="caption" color="text.secondary">
-          * 텍스트 클립 선택 시 상세 편집 가능
-        </Typography>
-      </Box>
     </>
   )
 }
 
 function ShapePanel({ type }: { type: 'rect' | 'circle' | 'arrow' }) {
+  const selectedClipId = useTimelineStore((s) => s.selectedClipId)
+  const tracks = useTimelineStore((s) => s.tracks)
+  const updateClipCanvas = useTimelineStore((s) => s.updateClipCanvas)
+
+  const clip = selectedClipId
+    ? tracks.flatMap((track) => track.clips).find((candidate) => candidate.id === selectedClipId)
+    : null
+
+  if (!clip || clip.clipType !== 'shape' || !clip.shapeProps) {
+    return (
+      <Box sx={{ px: 1.5, py: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          캔버스에서 도형 클립을 선택하세요.
+        </Typography>
+      </Box>
+    )
+  }
+
+  const shapeProps = clip.shapeProps
+  const updateShape = (label: string, update: Partial<typeof shapeProps>) => {
+    withHistory(label, () =>
+      updateClipCanvas(clip.id, {
+        shapeProps: {
+          ...shapeProps,
+          ...update,
+        },
+      })
+    )
+  }
+  const selectedType = shapeProps.shapeType
+
   return (
     <>
       <SectionTitle>도형 속성</SectionTitle>
-      <Row label="채우기">
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box
-            component="input"
-            type="color"
-            defaultValue="#4fc3f7"
-            sx={{
-              width: 28,
-              height: 24,
-              border: 'none',
-              borderRadius: 0.5,
-              cursor: 'pointer',
-              p: 0,
-            }}
-          />
-          <TextField
-            size="small"
-            defaultValue="#4fc3f7"
-            inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
-            sx={{ flex: 1 }}
-          />
+      {selectedType !== type && (
+        <Box sx={{ px: 1.5, pb: 0.5 }}>
+          <Typography variant="caption" color="text.secondary">
+            선택된 도형: {selectedType}
+          </Typography>
         </Box>
+      )}
+      <Row label="채우기">
+        <ColorInput
+          value={shapeProps.fill}
+          onChange={(value) => updateShape('도형 채우기 색상 변경', { fill: value })}
+        />
       </Row>
       <Row label="선 색">
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box
-            component="input"
-            type="color"
-            defaultValue="#ffffff"
-            sx={{
-              width: 28,
-              height: 24,
-              border: 'none',
-              borderRadius: 0.5,
-              cursor: 'pointer',
-              p: 0,
-            }}
-          />
-          <TextField
-            size="small"
-            defaultValue="#ffffff"
-            inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
-            sx={{ flex: 1 }}
-          />
-        </Box>
+        <ColorInput
+          value={shapeProps.stroke}
+          onChange={(value) => updateShape('도형 선 색상 변경', { stroke: value })}
+        />
       </Row>
       <Row label="선 두께">
-        <NumInput value={2} min={0} max={50} onChange={() => {}} unit="px" />
+        <NumInput
+          value={shapeProps.strokeWidth}
+          min={0}
+          max={50}
+          onChange={(value) => updateShape('도형 선 두께 변경', { strokeWidth: value })}
+          unit="px"
+        />
       </Row>
-      {type === 'rect' && (
+      {selectedType === 'rect' && (
         <Row label="모서리">
-          <NumInput value={0} min={0} max={500} onChange={() => {}} unit="px" />
+          <NumInput
+            value={shapeProps.cornerRadius ?? 0}
+            min={0}
+            max={500}
+            onChange={(value) => updateShape('도형 모서리 변경', { cornerRadius: value })}
+            unit="px"
+          />
         </Row>
       )}
-      {type === 'arrow' && (
+      <Row label="선 스타일">
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={shapeProps.dash?.length ? 'dash' : 'solid'}
+          onChange={(_, value) => {
+            if (value) updateShape('도형 선 스타일 변경', { dash: value === 'dash' ? [12, 8] : [] })
+          }}
+          sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 0.75, fontSize: 11 } }}
+        >
+          <ToggleButton value="solid">실선</ToggleButton>
+          <ToggleButton value="dash">점선</ToggleButton>
+        </ToggleButtonGroup>
+      </Row>
+      {selectedType === 'arrow' && (
         <Row label="화살촉">
           <ToggleButtonGroup
             size="small"
+            value="filled"
             sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 0.75, fontSize: 11 } }}
           >
             <ToggleButton value="filled">채움</ToggleButton>

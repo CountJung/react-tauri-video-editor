@@ -2,6 +2,10 @@ import { type InvokeArgs, convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { type EventCallback, type UnlistenFn, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
+export function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
 /**
  * Tauri IPC wrapper — @tauri-apps/api/core 직접 import 금지, 이 함수만 사용.
  * Tauri 환경 여부 자동 감지.
@@ -28,11 +32,13 @@ export async function tauriListen<T>(
 export async function tauriOnCloseRequested(
   handler: (event: { preventDefault: () => void }) => void
 ): Promise<UnlistenFn> {
+  if (!isTauriRuntime()) return () => undefined
   return getCurrentWindow().onCloseRequested(handler)
 }
 
 /** 현재 Tauri 창을 닫는다 */
 export async function tauriCloseWindow(): Promise<void> {
+  if (!isTauriRuntime()) return
   await getCurrentWindow().close()
 }
 

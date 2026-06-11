@@ -53,6 +53,12 @@ export type TimelineState = {
 }
 ```
 
+### Canvas 배치 규칙
+
+- 미디어 클립을 처음 추가할 때 `x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`로 캔버스 전체를 차지하게 한다.
+- 원본 비디오/이미지의 비율 맞춤은 `Clip.fitMode`가 담당한다. 기본값 `fit`은 클립 사각형 내부에 전체 소스를 보이게 letterbox/pillarbox로 그린다.
+- 초기 배치 단계에서 소스 해상도 비율로 클립 사각형 자체를 줄이지 않는다. 그렇게 하면 `fitMode`가 중복 적용되어 프리뷰에서 영상 일부만 보이거나 속성 패널 좌표가 예상과 달라질 수 있다.
+
 ---
 
 ## Zustand Store 액션 패턴

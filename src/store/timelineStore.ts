@@ -129,22 +129,14 @@ function calcDuration(tracks: Track[]): number {
   )
 }
 
-/** 미디어 클립의 기본 Canvas 크기: 에셋 해상도 → 캔버스 전체 채우기 */
-function defaultClipSize(
-  asset: Asset,
+/** 미디어 클립 기본 영역: 클립은 캔버스 전체를 차지하고 fitMode가 내부 영상을 맞춘다. */
+export function getDefaultMediaClipRect(
+  assetType: AssetType,
   canvasW: number,
   canvasH: number
 ): { x: number; y: number; width: number; height: number } {
-  if (asset.type === 'audio') return { x: 0, y: 0, width: 0, height: 0 }
-  const w = asset.width || canvasW
-  const h = asset.height || canvasH
-  // 캔버스에 맞게 letterbox fit
-  const scale = Math.min(canvasW / w, canvasH / h)
-  const width = Math.round(w * scale)
-  const height = Math.round(h * scale)
-  const x = Math.round((canvasW - width) / 2)
-  const y = Math.round((canvasH - height) / 2)
-  return { x, y, width, height }
+  if (assetType === 'audio') return { x: 0, y: 0, width: 0, height: 0 }
+  return { x: 0, y: 0, width: canvasW, height: canvasH }
 }
 
 function makeTrack(type: TrackType, zIndex: number): Track {
@@ -299,8 +291,10 @@ interface TimelineActions {
 // .env 기본값 읽기: localStorage 저장값 → VITE_* 환경변수 → 하드코딩 기본값 순
 function readStoredNumber(key: string, envVal: string | undefined, fallback: number): number {
   try {
-    const raw = localStorage.getItem(key)
-    if (raw !== null) return JSON.parse(raw) as number
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(key)
+      if (raw !== null) return JSON.parse(raw) as number
+    }
   } catch {
     // ignore
   }
@@ -355,7 +349,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
     set((state) => {
       const snap = snapToGrid(Math.max(0, startSec), state.snapInterval)
       const dur = asset.duration || 5
-      const size = defaultClipSize(asset, state.canvasWidth, state.canvasHeight)
+      const rect = getDefaultMediaClipRect(asset.type, state.canvasWidth, state.canvasHeight)
       const clip: Clip = {
         id: crypto.randomUUID(),
         assetId: asset.id,
@@ -364,7 +358,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         trimStart: 0,
         trimEnd: dur,
         clipType: 'media',
-        ...size,
+        ...rect,
         rotation: 0,
         opacity: 1,
         fitMode: 'fit',
@@ -372,7 +366,7 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
       const newTracks = state.tracks.map((t) =>
         t.id === trackId ? { ...t, clips: resolveCollisions([...t.clips, clip]) } : t
       )
-      return { tracks: newTracks, duration: calcDuration(newTracks) }
+      return { tracks: newTracks, duration: calcDuration(newTracks), selectedClipId: clip.id }
     }),
 
   moveClip: (clipId, newStart) =>

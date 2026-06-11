@@ -1,4 +1,5 @@
 import type { Asset, Clip, Track } from '@/store/timelineStore'
+import { getDefaultMediaClipRect } from '@/store/timelineStore'
 import { describe, expect, it } from 'vitest'
 import { collectActiveLayers, getFitDrawRect, hitTestClip, hitTestLayers } from './canvasCompositor'
 
@@ -46,6 +47,15 @@ const asset: Asset = {
 }
 
 describe('canvas compositor helpers', () => {
+  it('uses the full canvas as the default media clip rect', () => {
+    expect(getDefaultMediaClipRect('video', 1920, 1080)).toEqual({
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    })
+  })
+
   it('collects only visible active non-audio layers sorted by zIndex', () => {
     const lower = track({ id: 'lower', zIndex: 1, clips: [clip({ id: 'lower-clip' })] })
     const upper = track({ id: 'upper', zIndex: 2, clips: [clip({ id: 'upper-clip' })] })

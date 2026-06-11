@@ -60,6 +60,15 @@ type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 
 const HANDLE_SIZE = 18
 const MIN_OBJECT_SIZE = 16
+const FALLBACK_TEXT_PROPS = {
+  text: '',
+  fontFamily: 'sans-serif',
+  fontSize: 72,
+  color: '#ffffff',
+  bold: false,
+  italic: false,
+  align: 'center' as const,
+}
 
 function findTrackId(
   tracks: ReturnType<typeof useTimelineStore.getState>['tracks'],
@@ -305,7 +314,7 @@ export function PreviewPlayer() {
   }, [storeCurrentTime, isSliderDragging])
 
   const canvasPoint = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
+    (event: React.MouseEvent<HTMLCanvasElement> | React.PointerEvent<HTMLCanvasElement>) => {
       const canvas = event.currentTarget
       const rect = canvas.getBoundingClientRect()
       return {
@@ -314,6 +323,20 @@ export function PreviewPlayer() {
       }
     },
     [canvasWidth, canvasHeight]
+  )
+
+  const handleCanvasDoubleClick = useCallback(
+    (event: React.MouseEvent<HTMLCanvasElement>) => {
+      const point = canvasPoint(event)
+      const hit = hitTestLayers(activeLayers, point.x, point.y)
+      if (!hit || hit.clipType !== 'text') return
+      selectClip(hit.id)
+      setTextDialog({
+        clipId: hit.id,
+        text: hit.textProps?.text ?? '',
+      })
+    },
+    [activeLayers, canvasPoint, selectClip]
   )
 
   const handlePointerDown = useCallback(
@@ -533,9 +556,11 @@ export function PreviewPlayer() {
       >
         <Box
           sx={{
-            aspectRatio: `${canvasWidth} / ${canvasHeight}`,
-            maxWidth: '100%',
-            maxHeight: '100%',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             position: 'relative',
             overflow: 'hidden',
           }}
@@ -563,10 +588,14 @@ export function PreviewPlayer() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
+            onDoubleClick={handleCanvasDoubleClick}
             sx={{
               display: 'block',
-              width: '100%',
-              height: '100%',
+              width: 'auto',
+              height: 'auto',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              aspectRatio: `${canvasWidth} / ${canvasHeight}`,
               cursor: dragRef.current ? 'grabbing' : 'default',
             }}
           />
@@ -662,15 +691,8 @@ export function PreviewPlayer() {
                         ...(useTimelineStore
                           .getState()
                           .tracks.flatMap((track) => track.clips)
-                          .find((clip) => clip.id === textDialog.clipId)?.textProps ?? {
-                          text: '',
-                          fontFamily: 'sans-serif',
-                          fontSize: 72,
-                          color: '#ffffff',
-                          bold: false,
-                          italic: false,
-                          align: 'center',
-                        }),
+                          .find((clip) => clip.id === textDialog.clipId)?.textProps ??
+                          FALLBACK_TEXT_PROPS),
                         text: textDialog.text,
                       },
                     })

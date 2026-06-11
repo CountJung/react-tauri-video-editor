@@ -263,10 +263,10 @@
 
 - [x] **TextClip Canvas 렌더링** — fontFamily, fontSize, color, bold, italic, shadow, outline
 - [x] **ShapeClip Canvas 렌더링** — fill, stroke, strokeWidth, opacity, dash pattern
-- [ ] **텍스트 편집 팝업** — 더블클릭 → ResizableDialog 인라인 에디터
-- [ ] **폰트 선택** — Google Fonts 또는 시스템 폰트 목록 조회
-- [ ] **색상 피커** — MUI Color Picker 통합
-- [ ] **도형 속성 패널** — 선택된 ShapeClip의 속성 편집 (채우기/선 색, 두께 등)
+- [x] **텍스트 편집 팝업** — 더블클릭 → ResizableDialog 인라인 에디터
+- [x] **폰트 선택** — Google Fonts 또는 시스템 폰트 목록 조회
+- [x] **색상 피커** — MUI Color Picker 통합
+- [x] **도형 속성 패널** — 선택된 ShapeClip의 속성 편집 (채우기/선 색, 두께 등)
 
 ---
 
@@ -329,7 +329,7 @@
 - [x] **프로젝트 저장 안정화 1차** — JSON 검증 후 임시 파일 write + rename 방식 저장
 - [ ] **Dirty/Undo 적용 범위 완성** — Canvas 드래그, PropertiesPanel 입력, ToolPanel 액션 전체를 `withHistory()`로 통합
 - [ ] **Undo/Redo 후 dirty 정책 정리** — undo/redo 실행 후 저장 필요 상태와 저장 직후 history 정책 결정
-- [ ] **브라우저 개발 모드 Tauri guard** — Vite 브라우저 실행 시 `window.__TAURI__` 부재를 명확히 처리하고 IPC 버튼을 mock/disable
+- [x] **브라우저 개발 모드 Tauri guard** — Vite 브라우저 실행 시 `window.__TAURI__` 부재를 명확히 처리하고 IPC 버튼을 mock/disable
 - [ ] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
 - [ ] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
 - [x] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결

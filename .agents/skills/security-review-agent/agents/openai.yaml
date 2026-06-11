@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Review Agent"
+  short_description: "Review Tauri IPC, paths, capabilities, sidecars, and logs."
+  default_prompt: "Use $security-review-agent to inspect suspected security risks in Tauri IPC, filesystem paths, capabilities, FFmpeg sidecars, browser fallback, or logs."
