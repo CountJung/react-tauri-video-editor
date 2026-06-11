@@ -333,6 +333,8 @@
 - [ ] **Dirty/Undo 적용 범위 완성** — Canvas 드래그, PropertiesPanel 입력, ToolPanel 액션 전체를 `withHistory()`로 통합
 - [ ] **Undo/Redo 후 dirty 정책 정리** — undo/redo 실행 후 저장 필요 상태와 저장 직후 history 정책 결정
 - [x] **브라우저 개발 모드 Tauri guard** — Vite 브라우저 실행 시 `window.__TAURI__` 부재를 명확히 처리하고 IPC 버튼을 mock/disable
+- [x] **브라우저 검증 fallback 지침화** — Codex 인앱 브라우저 실패 시 Playwright MCP로 `127.0.0.1:1420` 재시도
+- [x] **fitMode 동일 비율 안내** — 원본 소스와 클립 프레임 비율이 같아 맞춤 모드 차이가 보이지 않는 경우 속성 패널에서 안내
 - [ ] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
 - [ ] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
 - [x] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결

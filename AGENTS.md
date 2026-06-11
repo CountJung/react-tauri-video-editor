@@ -111,6 +111,12 @@ cargo clippy      # Rust lint
 - macOS/Linux는 `SIGTERM`, Windows는 `taskkill /T /F`로 helper가 시작한 Vite 프로세스 트리를 정리한다.
 - 원격/외부 기기 테스트처럼 host를 바꿔야 할 때만 `VITE_DEV_URL`과 `TAURI_DEV_HOST`를 함께 지정한다. 로컬 VS Code 디버깅 기본값은 바꾸지 않는다.
 
+### 브라우저 검증 도구 fallback
+
+- 로컬 UI 검증은 우선 Codex 인앱 브라우저(`iab`)로 `http://127.0.0.1:1420`을 연다.
+- 인앱 브라우저가 사용할 수 없거나 연결에 실패하면 즉시 Playwright MCP(`mcp__playwright`)로 같은 URL을 열어 재시도한다.
+- Playwright MCP 도구 범위가 제한되어 픽셀 스크린샷·클릭 검증이 불가능하면, 가능한 DOM snapshot/console 결과를 기록하고 부족한 검증 범위를 응답에 명시한다.
+
 ---
 
 ## 스킬 파일 (도메인별 상세 지침)

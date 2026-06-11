@@ -39,6 +39,10 @@ During playback, the preview must not seek the hidden `<video>` element on every
 Seeking is reserved for pause/scrub, clip changes, or large drift correction; otherwise Canvas draws
 the live decoded video frame each animation frame.
 
+When verifying the local UI from Codex, open `http://127.0.0.1:1420` with the in-app browser first.
+If that browser is unavailable, retry the same URL with Playwright MCP and report any remaining
+verification limits such as missing screenshot or click tools.
+
 ### VS Code Tauri Debugging
 
 Use one of the checked-in launch configurations:

@@ -69,6 +69,12 @@
 - helper는 기존 서버 감지 시 재사용하고, 새로 시작한 서버는 macOS/Linux에서 `SIGTERM`, Windows에서 `taskkill /T /F`로 정리한다.
 - 원격/VM 테스트로 host를 바꿀 때만 `VITE_DEV_URL`과 `TAURI_DEV_HOST`를 함께 지정한다. 변경 시 `docs/Guide.md`도 동기화한다.
 
+### 브라우저 검증 도구 fallback
+
+- 로컬 UI 검증은 우선 Codex 인앱 브라우저(`iab`)로 `http://127.0.0.1:1420`을 연다.
+- 인앱 브라우저가 사용할 수 없거나 연결에 실패하면 즉시 Playwright MCP(`mcp__playwright`)로 같은 URL을 열어 재시도한다.
+- Playwright MCP 도구 범위가 제한되어 픽셀 스크린샷·클릭 검증이 불가능하면, 가능한 DOM snapshot/console 결과를 기록하고 부족한 검증 범위를 응답에 명시한다.
+
 ---
 
 ## 코드 스타일

@@ -1,4 +1,5 @@
 import { withHistory } from '@/lib/withHistory'
+import { useAssetStore } from '@/store/assetStore'
 import { useProjectStore } from '@/store/projectStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { type ToolType, useToolStore } from '@/store/toolStore'
@@ -51,6 +52,7 @@ const FALLBACK_TEXT_PROPS = {
 
 const MIN_CANVAS_SIZE = 64
 const MAX_CANVAS_SIZE = 8192
+const ASPECT_RATIO_EPSILON = 0.01
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 헬퍼
@@ -160,6 +162,11 @@ function ColorInput({
   )
 }
 
+function formatRatio(width: number, height: number): string {
+  if (width <= 0 || height <= 0) return '-'
+  return (width / height).toFixed(2)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 도구별 패널 컴포넌트
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,6 +174,7 @@ function ColorInput({
 function SelectPanel() {
   const selectedClipId = useTimelineStore((s) => s.selectedClipId)
   const tracks = useTimelineStore((s) => s.tracks)
+  const assets = useAssetStore((s) => s.assets)
   const canvasWidth = useTimelineStore((s) => s.canvasWidth)
   const canvasHeight = useTimelineStore((s) => s.canvasHeight)
   const updateClipCanvas = useTimelineStore((s) => s.updateClipCanvas)
@@ -177,6 +185,15 @@ function SelectPanel() {
   const clip = selectedClipId
     ? tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId)
     : null
+  const selectedAsset = clip?.assetId ? assets.find((asset) => asset.id === clip.assetId) : null
+  const sourceWidth = selectedAsset?.width ?? 0
+  const sourceHeight = selectedAsset?.height ?? 0
+  const sourceAspect = sourceWidth > 0 && sourceHeight > 0 ? sourceWidth / sourceHeight : null
+  const clipAspect = clip && clip.width > 0 && clip.height > 0 ? clip.width / clip.height : null
+  const fitModesLookSame =
+    sourceAspect !== null &&
+    clipAspect !== null &&
+    Math.abs(sourceAspect - clipAspect) < ASPECT_RATIO_EPSILON
 
   const updateCanvasSize = (width: number, height: number) => {
     const nextWidth = Math.max(MIN_CANVAS_SIZE, Math.min(MAX_CANVAS_SIZE, Math.round(width)))
@@ -329,6 +346,16 @@ function SelectPanel() {
               <MenuItem value="crop">crop — cropRect 사용</MenuItem>
             </TextField>
           </Row>
+          {fitModesLookSame && (
+            <Box sx={{ px: 1.5, pb: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                원본({sourceWidth}×{sourceHeight}, {formatRatio(sourceWidth, sourceHeight)})과 클립(
+                {Math.round(clip.width)}×{Math.round(clip.height)},{' '}
+                {formatRatio(clip.width, clip.height)}) 비율이 같아 fit/fill/stretch가 거의 동일하게
+                보일 수 있습니다.
+              </Typography>
+            </Box>
+          )}
         </>
       )}
     </>
