@@ -195,6 +195,15 @@ APP_TEMP_DIR=.video-editor-temp
 
 ---
 
+## 창 상태 저장
+
+- 메인 데스크톱 창의 크기와 위치는 `tauri-plugin-window-state`로 저장·복원한다.
+- Rust 플러그인은 `src-tauri/src/lib.rs`의 `tauri::Builder`에 등록한다.
+- Capability에는 `window-state:default`를 추가한다.
+- 별도 프론트엔드 JS 호출 없이 앱 종료 시 저장, 다음 실행 시 복원이 자동으로 수행된다.
+
+---
+
 ## macOS 외장하드 디버깅 주의사항
 
 외장 exFAT 볼륨에서 Tauri/Rust를 디버깅할 때는 빌드 산출물이 워크스페이스 내부 `src-tauri/target`에 남지 않도록 반드시 분리한다.

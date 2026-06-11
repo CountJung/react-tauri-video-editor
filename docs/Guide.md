@@ -12,6 +12,25 @@ pnpm dev
 
 `pnpm dev` runs `tauri dev`. Tauri uses `src-tauri/tauri.conf.json` and starts Vite through `beforeDevCommand`.
 
+### Window State
+
+The desktop window remembers its last size and position through `tauri-plugin-window-state`.
+The plugin is registered in `src-tauri/src/lib.rs` and enabled with the `window-state:default`
+capability. On the next launch, Tauri restores the previous window bounds automatically.
+
+### Preview Canvas Controls
+
+The preview canvas has two independent size controls:
+
+- Output canvas size: edit W/H in the Select tool properties panel. This updates the project canvas
+  dimensions and keeps full-canvas media clips aligned to the new frame.
+- Display zoom: use the preview overlay selector (`맞춤`, `25%`, `50%`, `75%`, `100%`, `150%`).
+  This changes only how large the canvas appears in the editor, not the export resolution.
+
+When a video or image asset is first dropped onto a media track, its clip frame is initialized to the
+full project canvas (`x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`). The clip `fitMode`
+then controls how the source media is drawn inside that frame.
+
 ### VS Code Tauri Debugging
 
 Use one of the checked-in launch configurations:

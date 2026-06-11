@@ -201,6 +201,8 @@
   - `Clip` 에 `fitMode: 'fit' | 'fill' | 'stretch' | 'center' | 'crop'` 속성 추가
   - 클립 우클릭 컨텍스트 메뉴 또는 속성 패널에서 변경 가능
 - [x] **fitMode → FFmpeg Export 연동** — fit/fill/stretch를 `scale` + `pad`/`crop` 필터로 변환
+- [x] **초기 미디어 캔버스 배치 수정** — 에셋을 비디오 라인에 놓으면 클립 프레임을 캔버스 전체(`x=0`, `y=0`, `W/H=canvas`)로 배치하고 `fit`은 내부 소스 맞춤만 담당
+- [x] **프리뷰 캔버스 크기 UI** — 속성 패널에서 출력 캔버스 W/H 조절, 프리뷰 오버레이에서 표시 배율(`맞춤`, `25%`~`150%`) 조절
 
 ---
 
@@ -351,5 +353,6 @@
 - [x] **VS Code 디버깅 preLaunchTask 안정화** — Vite 1420 포트가 이미 사용 중이어도 `start-vite-dev-server`가 실패하지 않도록 idempotent helper 추가
 - [x] **크로스플랫폼 디버깅 지침화** — macOS/Windows 공통 Vite helper, 127.0.0.1 devUrl 규칙, 플랫폼별 cleanup 절차를 스크립트와 문서에 명시
 - [x] **미저장 종료 경고 수정** — 창 닫기 시 `저장하지 않고 종료`가 재차 close guard에 막히지 않도록 우회 플래그와 상황별 버튼 라벨 적용
+- [x] **창 크기·위치 복원** — `tauri-plugin-window-state`로 앱 종료/재시작 간 메인 창 bounds 저장
 - [ ] **외장 볼륨 Cargo target 보완** — Tauri permission 생성 중 `._default.toml`이 생기는 환경에서는 `CARGO_TARGET_DIR`를 로컬 디스크로 지정하는 검증 스크립트/문서화 필요
 - [ ] `.github/prompts/` — `new-route.prompt.md`, `new-command.prompt.md` 내용 검토

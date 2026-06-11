@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from '@/lib/storageKeys'
+import { useStickyState } from '@/lib/useStickyState'
 import { withHistory } from '@/lib/withHistory'
 import { useAssetStore } from '@/store/assetStore'
 import type { Clip, ShapeType } from '@/store/timelineStore'
@@ -8,6 +10,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
+import MenuItem from '@mui/material/MenuItem'
 import Slider from '@mui/material/Slider'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
@@ -69,6 +72,17 @@ const FALLBACK_TEXT_PROPS = {
   italic: false,
   align: 'center' as const,
 }
+
+type PreviewZoom = 'fit' | '25' | '50' | '75' | '100' | '150'
+
+const PREVIEW_ZOOM_OPTIONS: Array<{ value: PreviewZoom; label: string }> = [
+  { value: 'fit', label: '맞춤' },
+  { value: '25', label: '25%' },
+  { value: '50', label: '50%' },
+  { value: '75', label: '75%' },
+  { value: '100', label: '100%' },
+  { value: '150', label: '150%' },
+]
 
 function findTrackId(
   tracks: ReturnType<typeof useTimelineStore.getState>['tracks'],
@@ -142,6 +156,7 @@ export function PreviewPlayer() {
     setCurrentTime,
     selectClip,
     updateClipCanvas,
+    normalizeMediaClipBounds,
     addTextClip,
     addShapeClip,
     splitClip,
@@ -179,6 +194,14 @@ export function PreviewPlayer() {
   const [localCurrentTime, setLocalCurrentTime] = useState(0)
   const [isSliderDragging, setIsSliderDragging] = useState(false)
   const [textDialog, setTextDialog] = useState<{ clipId: string; text: string } | null>(null)
+  const [previewZoom, setPreviewZoom] = useStickyState<PreviewZoom>(
+    'fit',
+    STORAGE_KEYS.PREVIEW_CANVAS_ZOOM
+  )
+
+  useEffect(() => {
+    normalizeMediaClipBounds()
+  }, [normalizeMediaClipBounds])
 
   useEffect(() => {
     currentTimeRef.current = storeCurrentTime
@@ -532,6 +555,7 @@ export function PreviewPlayer() {
   const totalDuration = duration || 1
   const canPlay = duration > 0
   const activeAssetName = activeLayers.find((layer) => layer.asset)?.asset?.name
+  const fixedPreviewScale = previewZoom === 'fit' ? null : Number(previewZoom) / 100
 
   return (
     <Box
@@ -549,20 +573,23 @@ export function PreviewPlayer() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          overflow: 'hidden',
+          overflow: fixedPreviewScale ? 'auto' : 'hidden',
           minHeight: 0,
           position: 'relative',
+          p: 1,
         }}
       >
         <Box
           sx={{
-            width: '100%',
-            height: '100%',
+            width: fixedPreviewScale ? 'max-content' : '100%',
+            height: fixedPreviewScale ? 'max-content' : '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
-            overflow: 'hidden',
+            overflow: 'visible',
+            minWidth: fixedPreviewScale ? canvasWidth * fixedPreviewScale : 0,
+            minHeight: fixedPreviewScale ? canvasHeight * fixedPreviewScale : 0,
           }}
         >
           {activeLayers.length === 0 && (
@@ -591,14 +618,53 @@ export function PreviewPlayer() {
             onDoubleClick={handleCanvasDoubleClick}
             sx={{
               display: 'block',
-              width: 'auto',
-              height: 'auto',
-              maxWidth: '100%',
-              maxHeight: '100%',
+              width: fixedPreviewScale ? canvasWidth * fixedPreviewScale : 'auto',
+              height: fixedPreviewScale ? canvasHeight * fixedPreviewScale : 'auto',
+              maxWidth: fixedPreviewScale ? 'none' : '100%',
+              maxHeight: fixedPreviewScale ? 'none' : '100%',
               aspectRatio: `${canvasWidth} / ${canvasHeight}`,
+              outline: '1px solid rgba(255,255,255,0.16)',
               cursor: dragRef.current ? 'grabbing' : 'default',
             }}
           />
+        </Box>
+
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 1,
+            py: 0.5,
+            bgcolor: 'rgba(18,18,18,0.82)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 1,
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 11 }}>
+            {canvasWidth}×{canvasHeight}
+          </Typography>
+          <TextField
+            size="small"
+            select
+            value={previewZoom}
+            onChange={(event) => setPreviewZoom(event.target.value as PreviewZoom)}
+            inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
+            sx={{
+              minWidth: 74,
+              '& .MuiOutlinedInput-root': { fontSize: 12, bgcolor: 'background.paper' },
+            }}
+          >
+            {PREVIEW_ZOOM_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
         </Box>
       </Box>
 

@@ -129,6 +129,50 @@ function calcDuration(tracks: Track[]): number {
   )
 }
 
+function isCanvasSizedMediaClip(clip: Clip, canvasW: number, canvasH: number): boolean {
+  return (
+    clip.clipType === 'media' &&
+    Math.round(clip.width) === Math.round(canvasW) &&
+    Math.round(clip.height) === Math.round(canvasH)
+  )
+}
+
+function normalizeLegacyMediaClipBounds(
+  tracks: Track[],
+  canvasW: number,
+  canvasH: number
+): Track[] {
+  return tracks.map((track) => ({
+    ...track,
+    clips: track.clips.map((clip) =>
+      isCanvasSizedMediaClip(clip, canvasW, canvasH) && (clip.x < 0 || clip.y < 0)
+        ? { ...clip, x: 0, y: 0 }
+        : clip
+    ),
+  }))
+}
+
+function normalizeMediaClipBoundsForCanvasResize(
+  tracks: Track[],
+  oldCanvasW: number,
+  oldCanvasH: number,
+  newCanvasW: number,
+  newCanvasH: number
+): Track[] {
+  return tracks.map((track) => ({
+    ...track,
+    clips: track.clips.map((clip) => {
+      if (
+        isCanvasSizedMediaClip(clip, oldCanvasW, oldCanvasH) ||
+        isCanvasSizedMediaClip(clip, newCanvasW, newCanvasH)
+      ) {
+        return { ...clip, x: 0, y: 0, width: newCanvasW, height: newCanvasH }
+      }
+      return clip
+    }),
+  }))
+}
+
 /** 미디어 클립 기본 영역: 클립은 캔버스 전체를 차지하고 fitMode가 내부 영상을 맞춘다. */
 export function getDefaultMediaClipRect(
   assetType: AssetType,
@@ -274,7 +318,9 @@ interface TimelineActions {
 
   // Canvas 변환
   updateClipCanvas: (clipId: string, update: ClipCanvasUpdate) => void
+  fitClipToCanvas: (clipId: string) => void
   selectClip: (clipId: string | null) => void
+  normalizeMediaClipBounds: () => void
 
   // 캔버스
   setCanvasDimensions: (width: number, height: number) => void
@@ -518,11 +564,47 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
       })),
     })),
 
+  fitClipToCanvas: (clipId) =>
+    set((state) => ({
+      tracks: state.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) =>
+          clip.id === clipId
+            ? {
+                ...clip,
+                x: 0,
+                y: 0,
+                width: state.canvasWidth,
+                height: state.canvasHeight,
+                fitMode: clip.clipType === 'media' ? 'fit' : clip.fitMode,
+                cropRect: clip.clipType === 'media' ? undefined : clip.cropRect,
+              }
+            : clip
+        ),
+      })),
+    })),
+
   selectClip: (clipId) => set({ selectedClipId: clipId }),
+
+  normalizeMediaClipBounds: () =>
+    set((state) => ({
+      tracks: normalizeLegacyMediaClipBounds(state.tracks, state.canvasWidth, state.canvasHeight),
+    })),
 
   // ── 재생 ─────────────────────────────────────────────────────────────────
 
-  setCanvasDimensions: (width, height) => set({ canvasWidth: width, canvasHeight: height }),
+  setCanvasDimensions: (width, height) =>
+    set((state) => ({
+      canvasWidth: width,
+      canvasHeight: height,
+      tracks: normalizeMediaClipBoundsForCanvasResize(
+        state.tracks,
+        state.canvasWidth,
+        state.canvasHeight,
+        width,
+        height
+      ),
+    })),
 
   resetTimeline: (width, height) =>
     set((state) => ({
@@ -536,13 +618,13 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
     })),
 
   loadTracks: (tracks) =>
-    set({
-      tracks,
+    set((state) => ({
+      tracks: normalizeLegacyMediaClipBounds(tracks, state.canvasWidth, state.canvasHeight),
       currentTime: 0,
       duration: calcDuration(tracks),
       isPlaying: false,
       selectedClipId: null,
-    }),
+    })),
 
   setCurrentTime: (time) => set({ currentTime: Math.max(0, time) }),
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),

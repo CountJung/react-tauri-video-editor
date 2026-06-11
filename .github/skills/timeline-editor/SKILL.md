@@ -58,6 +58,9 @@ export type TimelineState = {
 - 미디어 클립을 처음 추가할 때 `x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`로 캔버스 전체를 차지하게 한다.
 - 원본 비디오/이미지의 비율 맞춤은 `Clip.fitMode`가 담당한다. 기본값 `fit`은 클립 사각형 내부에 전체 소스를 보이게 letterbox/pillarbox로 그린다.
 - 초기 배치 단계에서 소스 해상도 비율로 클립 사각형 자체를 줄이지 않는다. 그렇게 하면 `fitMode`가 중복 적용되어 프리뷰에서 영상 일부만 보이거나 속성 패널 좌표가 예상과 달라질 수 있다.
+- 사용자가 캔버스 출력 크기를 변경하면 full-canvas 미디어 클립은 새 캔버스 크기로 함께 보정한다.
+- 프리뷰 표시 배율(`preview:canvas:zoom`)은 편집기에서 보이는 크기만 바꾸며, `canvasWidth`/`canvasHeight` 출력 해상도와 섞지 않는다.
+- 기존 프로젝트나 HMR 상태에서 full-canvas 미디어 클립의 `x`/`y`가 음수로 남을 수 있으므로, 로드·캔버스 크기 변경·수동 "캔버스 전체에 맞춤" 동작에서 `x=0`, `y=0`으로 복구한다.
 
 ---
 

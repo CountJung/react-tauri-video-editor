@@ -1,5 +1,6 @@
 import type { Asset, Clip, Track } from '@/store/timelineStore'
 import { getDefaultMediaClipRect } from '@/store/timelineStore'
+import { useTimelineStore } from '@/store/timelineStore'
 import { describe, expect, it } from 'vitest'
 import { collectActiveLayers, getFitDrawRect, hitTestClip, hitTestLayers } from './canvasCompositor'
 
@@ -54,6 +55,73 @@ describe('canvas compositor helpers', () => {
       width: 1920,
       height: 1080,
     })
+  })
+
+  it('normalizes legacy full-canvas media clips with negative positions', () => {
+    useTimelineStore.getState().resetTimeline(1920, 1080)
+    useTimelineStore.getState().loadTracks([
+      track({
+        clips: [
+          clip({
+            x: -525,
+            y: -429,
+            width: 1920,
+            height: 1080,
+          }),
+        ],
+      }),
+    ])
+
+    const loadedClip = useTimelineStore.getState().tracks[0]?.clips[0]
+
+    expect(loadedClip).toMatchObject({ x: 0, y: 0, width: 1920, height: 1080 })
+  })
+
+  it('fits newly added video clips to the full canvas frame', () => {
+    useTimelineStore.getState().resetTimeline(1920, 1080)
+    useTimelineStore.getState().addClip('track-v1', asset, 0)
+
+    const loadedClip = useTimelineStore.getState().tracks[0]?.clips[0]
+
+    expect(loadedClip).toMatchObject({
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+      fitMode: 'fit',
+    })
+  })
+
+  it('resizes full-canvas media clips when the canvas size changes', () => {
+    useTimelineStore.getState().resetTimeline(1920, 1080)
+    useTimelineStore.getState().addClip('track-v1', asset, 0)
+    useTimelineStore.getState().setCanvasDimensions(1080, 1080)
+
+    const loadedClip = useTimelineStore.getState().tracks[0]?.clips[0]
+
+    expect(loadedClip).toMatchObject({ x: 0, y: 0, width: 1080, height: 1080 })
+  })
+
+  it('fits an existing media clip back to the canvas frame', () => {
+    useTimelineStore.getState().resetTimeline(1920, 1080)
+    useTimelineStore.getState().loadTracks([
+      track({
+        clips: [
+          clip({
+            x: -493,
+            y: -109,
+            width: 1920,
+            height: 1080,
+            fitMode: 'center',
+          }),
+        ],
+      }),
+    ])
+    useTimelineStore.getState().fitClipToCanvas('clip-1')
+
+    const loadedClip = useTimelineStore.getState().tracks[0]?.clips[0]
+
+    expect(loadedClip).toMatchObject({ x: 0, y: 0, width: 1920, height: 1080, fitMode: 'fit' })
   })
 
   it('collects only visible active non-audio layers sorted by zIndex', () => {

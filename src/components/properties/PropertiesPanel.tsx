@@ -1,4 +1,5 @@
 import { withHistory } from '@/lib/withHistory'
+import { useProjectStore } from '@/store/projectStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { type ToolType, useToolStore } from '@/store/toolStore'
 import type { SvgIconComponent } from '@mui/icons-material'
@@ -7,10 +8,12 @@ import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined'
 import ContentCutIcon from '@mui/icons-material/ContentCut'
 import CropIcon from '@mui/icons-material/Crop'
 import EastIcon from '@mui/icons-material/East'
+import FitScreenIcon from '@mui/icons-material/FitScreen'
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'
 import MouseIcon from '@mui/icons-material/Mouse'
 import RectangleOutlinedIcon from '@mui/icons-material/RectangleOutlined'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Slider from '@mui/material/Slider'
@@ -45,6 +48,9 @@ const FALLBACK_TEXT_PROPS = {
   italic: false,
   align: 'center' as const,
 }
+
+const MIN_CANVAS_SIZE = 64
+const MAX_CANVAS_SIZE = 8192
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 헬퍼
@@ -161,24 +167,77 @@ function ColorInput({
 function SelectPanel() {
   const selectedClipId = useTimelineStore((s) => s.selectedClipId)
   const tracks = useTimelineStore((s) => s.tracks)
+  const canvasWidth = useTimelineStore((s) => s.canvasWidth)
+  const canvasHeight = useTimelineStore((s) => s.canvasHeight)
   const updateClipCanvas = useTimelineStore((s) => s.updateClipCanvas)
+  const fitClipToCanvas = useTimelineStore((s) => s.fitClipToCanvas)
+  const setCanvasDimensions = useTimelineStore((s) => s.setCanvasDimensions)
+  const updateProjectMeta = useProjectStore((s) => s.updateProjectMeta)
 
   const clip = selectedClipId
     ? tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId)
     : null
 
+  const updateCanvasSize = (width: number, height: number) => {
+    const nextWidth = Math.max(MIN_CANVAS_SIZE, Math.min(MAX_CANVAS_SIZE, Math.round(width)))
+    const nextHeight = Math.max(MIN_CANVAS_SIZE, Math.min(MAX_CANVAS_SIZE, Math.round(height)))
+    withHistory('캔버스 크기 변경', () => setCanvasDimensions(nextWidth, nextHeight))
+    updateProjectMeta({ canvasWidth: nextWidth, canvasHeight: nextHeight, preset: 'custom' })
+  }
+
   if (!clip) {
     return (
-      <Box sx={{ px: 1.5, py: 2 }}>
-        <Typography variant="caption" color="text.secondary">
-          캔버스에서 클립을 선택하세요.
-        </Typography>
-      </Box>
+      <>
+        <SectionTitle>캔버스</SectionTitle>
+        <Row label="W">
+          <NumInput
+            value={canvasWidth}
+            min={MIN_CANVAS_SIZE}
+            max={MAX_CANVAS_SIZE}
+            onChange={(value) => updateCanvasSize(value, canvasHeight)}
+            unit="px"
+          />
+        </Row>
+        <Row label="H">
+          <NumInput
+            value={canvasHeight}
+            min={MIN_CANVAS_SIZE}
+            max={MAX_CANVAS_SIZE}
+            onChange={(value) => updateCanvasSize(canvasWidth, value)}
+            unit="px"
+          />
+        </Row>
+        <Box sx={{ px: 1.5, py: 2 }}>
+          <Typography variant="caption" color="text.secondary">
+            캔버스에서 클립을 선택하세요.
+          </Typography>
+        </Box>
+      </>
     )
   }
 
   return (
     <>
+      <SectionTitle>캔버스</SectionTitle>
+      <Row label="W">
+        <NumInput
+          value={canvasWidth}
+          min={MIN_CANVAS_SIZE}
+          max={MAX_CANVAS_SIZE}
+          onChange={(value) => updateCanvasSize(value, canvasHeight)}
+          unit="px"
+        />
+      </Row>
+      <Row label="H">
+        <NumInput
+          value={canvasHeight}
+          min={MIN_CANVAS_SIZE}
+          max={MAX_CANVAS_SIZE}
+          onChange={(value) => updateCanvasSize(canvasWidth, value)}
+          unit="px"
+        />
+      </Row>
+
       <SectionTitle>위치</SectionTitle>
       <Row label="X">
         <NumInput
@@ -240,6 +299,18 @@ function SelectPanel() {
       {clip.clipType === 'media' && (
         <>
           <SectionTitle>배치</SectionTitle>
+          <Box sx={{ px: 1.5, pb: 0.5 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              fullWidth
+              startIcon={<FitScreenIcon sx={{ fontSize: 16 }} />}
+              onClick={() => withHistory('클립을 캔버스에 맞춤', () => fitClipToCanvas(clip.id))}
+              sx={{ justifyContent: 'flex-start', fontSize: 12 }}
+            >
+              캔버스 전체에 맞춤
+            </Button>
+          </Box>
           <Row label="맞춤">
             <TextField
               size="small"

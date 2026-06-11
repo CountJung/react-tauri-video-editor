@@ -44,7 +44,7 @@ export function EditorLayout() {
   const [overlayInfo, setOverlayInfo] = useState<OverlayInfo | null>(null)
 
   const [assetWidth, setAssetWidth] = useStickyState(240, STORAGE_KEYS.PANEL_ASSET_WIDTH)
-  const [previewHeight, setPreviewHeight] = useStickyState(300, STORAGE_KEYS.PANEL_PREVIEW_HEIGHT)
+  const [previewHeight, setPreviewHeight] = useStickyState(520, STORAGE_KEYS.PANEL_PREVIEW_HEIGHT)
   const [propsWidth, setPropsWidth] = useStickyState(240, STORAGE_KEYS.PANEL_PROPERTIES_WIDTH)
   const [propsOpen, setPropsOpen] = useStickyState(true, STORAGE_KEYS.PANEL_PROPERTIES_OPEN)
 
@@ -118,7 +118,7 @@ export function EditorLayout() {
           <Box
             sx={{
               height: previewHeight,
-              minHeight: 120,
+              minHeight: 360,
               flexShrink: 0,
               borderBottom: 0,
               display: 'flex',
@@ -134,7 +134,7 @@ export function EditorLayout() {
           </Box>
           <LayoutResizer
             direction="horizontal"
-            onResize={(d) => setPreviewHeight((h) => Math.max(120, Math.min(600, h + d)))}
+            onResize={(d) => setPreviewHeight((h) => Math.max(360, Math.min(900, h + d)))}
           />
           <Box sx={{ flex: 1, overflow: 'hidden' }}>
             <TimelinePanel />
