@@ -137,6 +137,22 @@ function isCanvasSizedMediaClip(clip: Clip, canvasW: number, canvasH: number): b
   )
 }
 
+function fitModeForPrimaryVideoClip(clip: Clip): FitMode {
+  return clip.fitMode === 'center' || clip.fitMode === 'crop' ? 'fit' : clip.fitMode
+}
+
+function frameClipToCanvas(clip: Clip, canvasW: number, canvasH: number): Clip {
+  return {
+    ...clip,
+    x: 0,
+    y: 0,
+    width: canvasW,
+    height: canvasH,
+    fitMode: fitModeForPrimaryVideoClip(clip),
+    cropRect: clip.fitMode === 'crop' ? undefined : clip.cropRect,
+  }
+}
+
 function normalizeLegacyMediaClipBounds(
   tracks: Track[],
   canvasW: number,
@@ -144,11 +160,14 @@ function normalizeLegacyMediaClipBounds(
 ): Track[] {
   return tracks.map((track) => ({
     ...track,
-    clips: track.clips.map((clip) =>
-      isCanvasSizedMediaClip(clip, canvasW, canvasH) && (clip.x < 0 || clip.y < 0)
+    clips: track.clips.map((clip) => {
+      if (track.type === 'video' && clip.clipType === 'media') {
+        return frameClipToCanvas(clip, canvasW, canvasH)
+      }
+      return isCanvasSizedMediaClip(clip, canvasW, canvasH) && (clip.x < 0 || clip.y < 0)
         ? { ...clip, x: 0, y: 0 }
         : clip
-    ),
+    }),
   }))
 }
 
@@ -162,6 +181,9 @@ function normalizeMediaClipBoundsForCanvasResize(
   return tracks.map((track) => ({
     ...track,
     clips: track.clips.map((clip) => {
+      if (track.type === 'video' && clip.clipType === 'media') {
+        return frameClipToCanvas(clip, newCanvasW, newCanvasH)
+      }
       if (
         isCanvasSizedMediaClip(clip, oldCanvasW, oldCanvasH) ||
         isCanvasSizedMediaClip(clip, newCanvasW, newCanvasH)

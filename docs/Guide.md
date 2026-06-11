@@ -31,6 +31,14 @@ When a video or image asset is first dropped onto a media track, its clip frame 
 full project canvas (`x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`). The clip `fitMode`
 then controls how the source media is drawn inside that frame.
 
+Primary media on the `video` track is treated as the base layer. When a project is loaded or the
+canvas output size changes, those clips are reframed to the full canvas. Overlay clips keep their own
+placement.
+
+During playback, the preview must not seek the hidden `<video>` element on every timeline tick.
+Seeking is reserved for pause/scrub, clip changes, or large drift correction; otherwise Canvas draws
+the live decoded video frame each animation frame.
+
 ### VS Code Tauri Debugging
 
 Use one of the checked-in launch configurations:

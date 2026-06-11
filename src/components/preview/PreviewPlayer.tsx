@@ -17,6 +17,7 @@ import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ResizableDialog } from '../common/ResizableDialog'
 import {
+  type ActiveLayer,
   collectActiveLayers,
   drawImageLike,
   drawShapeClip,
@@ -84,11 +85,23 @@ const PREVIEW_ZOOM_OPTIONS: Array<{ value: PreviewZoom; label: string }> = [
   { value: '150', label: '150%' },
 ]
 
+const PLAYING_SEEK_DRIFT_SECONDS = 0.75
+const PAUSED_SEEK_EPSILON_SECONDS = 0.08
+
 function findTrackId(
   tracks: ReturnType<typeof useTimelineStore.getState>['tracks'],
   type: string
 ): string | null {
   return tracks.find((track) => track.type === type)?.id ?? null
+}
+
+function clampClipMediaTime(clip: Clip, timelineTime: number): number {
+  const targetTime = getClipLocalTime(clip, timelineTime)
+  return Math.max(clip.trimStart, Math.min(clip.trimEnd, targetTime))
+}
+
+function makeVideoSyncKey(clip: Clip): string {
+  return [clip.id, clip.start, clip.duration, clip.trimStart, clip.trimEnd].join(':')
 }
 
 function getResizeHandle(clip: Clip, x: number, y: number): ResizeHandle | null {
@@ -163,12 +176,14 @@ export function PreviewPlayer() {
   } = useTimelineStore()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const previewViewportRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
   const playRafRef = useRef<number | null>(null)
   const playLastTsRef = useRef<number | null>(null)
   const currentTimeRef = useRef(storeCurrentTime)
   const durationRef = useRef(duration)
   const videoCacheRef = useRef<Map<string, HTMLVideoElement>>(new Map())
+  const videoSyncKeyRef = useRef<Map<string, string>>(new Map())
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const dragRef = useRef<{
     mode: 'move' | 'resize' | 'rotate'
@@ -198,6 +213,8 @@ export function PreviewPlayer() {
     'fit',
     STORAGE_KEYS.PREVIEW_CANVAS_ZOOM
   )
+  const fixedPreviewScale = previewZoom === 'fit' ? null : Number(previewZoom) / 100
+  const [fitCanvasSize, setFitCanvasSize] = useState({ width: canvasWidth, height: canvasHeight })
 
   useEffect(() => {
     normalizeMediaClipBounds()
@@ -210,6 +227,37 @@ export function PreviewPlayer() {
     durationRef.current = duration
   }, [duration])
 
+  useEffect(() => {
+    if (fixedPreviewScale) {
+      setFitCanvasSize({
+        width: canvasWidth * fixedPreviewScale,
+        height: canvasHeight * fixedPreviewScale,
+      })
+      return
+    }
+
+    const viewport = previewViewportRef.current
+    if (!viewport) return
+
+    const updateSize = () => {
+      const style = window.getComputedStyle(viewport)
+      const paddingX = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight)
+      const paddingY = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+      const availableWidth = Math.max(1, viewport.clientWidth - paddingX)
+      const availableHeight = Math.max(1, viewport.clientHeight - paddingY)
+      const scale = Math.min(availableWidth / canvasWidth, availableHeight / canvasHeight)
+      setFitCanvasSize({
+        width: Math.max(1, Math.round(canvasWidth * scale)),
+        height: Math.max(1, Math.round(canvasHeight * scale)),
+      })
+    }
+
+    updateSize()
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [canvasWidth, canvasHeight, fixedPreviewScale])
+
   const activeLayers = useMemo(
     () => collectActiveLayers(tracks, assets, storeCurrentTime),
     [tracks, assets, storeCurrentTime]
@@ -219,39 +267,117 @@ export function PreviewPlayer() {
     () => tracks.flatMap((track) => track.clips).find((clip) => clip.id === selectedClipId) ?? null,
     [tracks, selectedClipId]
   )
+  const activeLayersRef = useRef<ActiveLayer[]>(activeLayers)
+  const selectedClipRef = useRef<Clip | null>(selectedClip)
 
   useEffect(() => {
-    for (const layer of activeLayers) {
-      const asset = layer.asset
-      if (!asset) continue
-      const url = getAssetUrl(asset)
-      if (asset.type === 'image' && !imageCacheRef.current.has(asset.id)) {
-        const img = new Image()
-        img.src = url
-        imageCacheRef.current.set(asset.id, img)
+    activeLayersRef.current = activeLayers
+  }, [activeLayers])
+
+  useEffect(() => {
+    selectedClipRef.current = selectedClip
+  }, [selectedClip])
+
+  const syncMediaElements = useCallback(
+    (
+      layers: ActiveLayer[],
+      timelineTime: number,
+      options: { forceSeek: boolean; playing: boolean }
+    ) => {
+      const activeVideoAssetIds = new Set<string>()
+
+      for (const layer of layers) {
+        const asset = layer.asset
+        if (!asset) continue
+        const url = getAssetUrl(asset)
+
+        if (asset.type === 'image') {
+          if (!imageCacheRef.current.has(asset.id)) {
+            const img = new Image()
+            img.src = url
+            imageCacheRef.current.set(asset.id, img)
+          }
+          continue
+        }
+
+        if (asset.type === 'video') {
+          activeVideoAssetIds.add(asset.id)
+          let video = videoCacheRef.current.get(asset.id)
+          if (!video) {
+            video = document.createElement('video')
+            video.muted = true
+            video.playsInline = true
+            video.preload = 'auto'
+            video.src = url
+            videoCacheRef.current.set(asset.id, video)
+          }
+          const targetTime = clampClipMediaTime(layer.clip, timelineTime)
+          const syncKey = makeVideoSyncKey(layer.clip)
+          const previousSyncKey = videoSyncKeyRef.current.get(asset.id)
+          const drift = Math.abs(video.currentTime - targetTime)
+          const shouldSeek =
+            options.forceSeek ||
+            previousSyncKey !== syncKey ||
+            drift > (options.playing ? PLAYING_SEEK_DRIFT_SECONDS : PAUSED_SEEK_EPSILON_SECONDS)
+
+          if (Number.isFinite(targetTime) && shouldSeek) {
+            video.currentTime = targetTime
+          }
+          videoSyncKeyRef.current.set(asset.id, syncKey)
+
+          if (options.playing) {
+            if (video.paused) void video.play().catch(() => {})
+          } else {
+            video.pause()
+          }
+        }
       }
-      if (asset.type === 'video') {
-        let video = videoCacheRef.current.get(asset.id)
-        if (!video) {
-          video = document.createElement('video')
-          video.muted = true
-          video.playsInline = true
-          video.preload = 'auto'
-          video.src = url
-          videoCacheRef.current.set(asset.id, video)
-        }
-        const targetTime = getClipLocalTime(layer.clip, storeCurrentTime)
-        if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.08) {
-          video.currentTime = Math.max(
-            layer.clip.trimStart,
-            Math.min(layer.clip.trimEnd, targetTime)
-          )
-        }
-        if (isPlaying) void video.play().catch(() => {})
-        else video.pause()
+
+      for (const [assetId, video] of videoCacheRef.current) {
+        if (!activeVideoAssetIds.has(assetId)) video.pause()
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (isPlaying) return
+    syncMediaElements(activeLayers, storeCurrentTime, { forceSeek: true, playing: false })
+  }, [activeLayers, isPlaying, storeCurrentTime, syncMediaElements])
+
+  useEffect(() => {
+    if (!isPlaying) return
+    let syncRaf: number | null = null
+    const sync = () => {
+      syncMediaElements(activeLayersRef.current, currentTimeRef.current, {
+        forceSeek: false,
+        playing: true,
+      })
+      syncRaf = requestAnimationFrame(sync)
+    }
+    sync()
+    return () => {
+      if (syncRaf !== null) cancelAnimationFrame(syncRaf)
+    }
+  }, [isPlaying, syncMediaElements])
+
+  useEffect(() => {
+    const activeAssetIds = new Set(assets.map((asset) => asset.id))
+
+    for (const [assetId, video] of videoCacheRef.current) {
+      if (!activeAssetIds.has(assetId)) {
+        video.pause()
+        video.removeAttribute('src')
+        video.load()
+        videoCacheRef.current.delete(assetId)
+        videoSyncKeyRef.current.delete(assetId)
       }
     }
-  }, [activeLayers, isPlaying, storeCurrentTime])
+
+    for (const assetId of imageCacheRef.current.keys()) {
+      if (!activeAssetIds.has(assetId)) imageCacheRef.current.delete(assetId)
+    }
+  }, [assets])
 
   useEffect(() => {
     const draw = () => {
@@ -262,7 +388,7 @@ export function PreviewPlayer() {
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      for (const layer of activeLayers) {
+      for (const layer of activeLayersRef.current) {
         const { clip, track, asset } = layer
         withClipTransform(ctx, clip, track.opacity, () => {
           if (clip.clipType === 'text') drawTextClip(ctx, clip)
@@ -292,7 +418,7 @@ export function PreviewPlayer() {
         })
       }
 
-      if (selectedClip) drawSelection(ctx, selectedClip)
+      if (selectedClipRef.current) drawSelection(ctx, selectedClipRef.current)
       rafRef.current = requestAnimationFrame(draw)
     }
     rafRef.current = requestAnimationFrame(draw)
@@ -300,7 +426,7 @@ export function PreviewPlayer() {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
-  }, [activeLayers, selectedClip])
+  }, [])
 
   useEffect(() => {
     if (!isPlaying) {
@@ -555,7 +681,6 @@ export function PreviewPlayer() {
   const totalDuration = duration || 1
   const canPlay = duration > 0
   const activeAssetName = activeLayers.find((layer) => layer.asset)?.asset?.name
-  const fixedPreviewScale = previewZoom === 'fit' ? null : Number(previewZoom) / 100
 
   return (
     <Box
@@ -568,6 +693,7 @@ export function PreviewPlayer() {
       }}
     >
       <Box
+        ref={previewViewportRef}
         sx={{
           flex: 1,
           display: 'flex',
@@ -618,8 +744,8 @@ export function PreviewPlayer() {
             onDoubleClick={handleCanvasDoubleClick}
             sx={{
               display: 'block',
-              width: fixedPreviewScale ? canvasWidth * fixedPreviewScale : 'auto',
-              height: fixedPreviewScale ? canvasHeight * fixedPreviewScale : 'auto',
+              width: fitCanvasSize.width,
+              height: fitCanvasSize.height,
               maxWidth: fixedPreviewScale ? 'none' : '100%',
               maxHeight: fixedPreviewScale ? 'none' : '100%',
               aspectRatio: `${canvasWidth} / ${canvasHeight}`,

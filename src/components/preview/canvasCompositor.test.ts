@@ -57,16 +57,17 @@ describe('canvas compositor helpers', () => {
     })
   })
 
-  it('normalizes legacy full-canvas media clips with negative positions', () => {
-    useTimelineStore.getState().resetTimeline(1920, 1080)
+  it('normalizes primary video track media clips to the current canvas frame', () => {
+    useTimelineStore.getState().resetTimeline(1080, 1080)
     useTimelineStore.getState().loadTracks([
       track({
         clips: [
           clip({
-            x: -525,
-            y: -429,
+            x: -493,
+            y: -109,
             width: 1920,
             height: 1080,
+            fitMode: 'center',
           }),
         ],
       }),
@@ -74,7 +75,22 @@ describe('canvas compositor helpers', () => {
 
     const loadedClip = useTimelineStore.getState().tracks[0]?.clips[0]
 
-    expect(loadedClip).toMatchObject({ x: 0, y: 0, width: 1920, height: 1080 })
+    expect(loadedClip).toMatchObject({ x: 0, y: 0, width: 1080, height: 1080, fitMode: 'fit' })
+  })
+
+  it('keeps overlay media placement when normalizing primary video clips', () => {
+    useTimelineStore.getState().resetTimeline(1920, 1080)
+    useTimelineStore.getState().loadTracks([
+      track({
+        id: 'overlay',
+        type: 'overlay',
+        clips: [clip({ x: 120, y: 80, width: 640, height: 360 })],
+      }),
+    ])
+
+    const loadedClip = useTimelineStore.getState().tracks[0]?.clips[0]
+
+    expect(loadedClip).toMatchObject({ x: 120, y: 80, width: 640, height: 360 })
   })
 
   it('fits newly added video clips to the full canvas frame', () => {
@@ -166,6 +182,17 @@ describe('canvas compositor helpers', () => {
       dy: 50,
       dw: 400,
       dh: 400,
+    })
+  })
+
+  it('keeps the full source visible in fit mode without source cropping', () => {
+    expect(
+      getFitDrawRect(1920, 1080, clip({ x: 0, y: 0, width: 1080, height: 1080, fitMode: 'fit' }))
+    ).toMatchObject({
+      dx: 0,
+      dy: 236.25,
+      dw: 1080,
+      dh: 607.5,
     })
   })
 
