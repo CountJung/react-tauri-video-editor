@@ -41,6 +41,7 @@ export function EditorLayout() {
   const assets = useAssetStore((s) => s.assets)
   const addClip = useTimelineStore((s) => s.addClip)
   const moveClip = useTimelineStore((s) => s.moveClip)
+  const reorderTracks = useTimelineStore((s) => s.reorderTracks)
   const [overlayInfo, setOverlayInfo] = useState<OverlayInfo | null>(null)
 
   const [assetWidth, setAssetWidth] = useStickyState(240, STORAGE_KEYS.PANEL_ASSET_WIDTH)
@@ -57,6 +58,8 @@ export function EditorLayout() {
       setOverlayInfo({ label: asset?.name ?? '에셋', color: '#1565c0' })
     } else if (data?.type === 'clip') {
       setOverlayInfo({ label: data.clipName ?? 'Clip', color: '#0d47a1' })
+    } else if (data?.type === 'track-layer') {
+      setOverlayInfo({ label: data.label ?? 'Layer', color: '#455a64' })
     }
   }
 
@@ -86,6 +89,15 @@ export function EditorLayout() {
       withHistory('클립 이동', () =>
         moveClip(clipId, Math.max(0, originalStart + event.delta.x / zoom))
       )
+    }
+
+    if (activeData?.type === 'track-layer' && overData?.type === 'track-layer') {
+      const fromIndex = activeData.index
+      const toIndex = overData.index
+      if (typeof fromIndex !== 'number' || typeof toIndex !== 'number' || fromIndex === toIndex) {
+        return
+      }
+      withHistory('트랙 순서 변경', () => reorderTracks(fromIndex, toIndex))
     }
   }
 

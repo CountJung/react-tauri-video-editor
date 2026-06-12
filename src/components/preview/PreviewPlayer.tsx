@@ -166,6 +166,7 @@ export function PreviewPlayer() {
   const canvasHeight = useTimelineStore((s) => s.canvasHeight)
   const selectedClipId = useTimelineStore((s) => s.selectedClipId)
   const activeTool = useToolStore((s) => s.activeTool)
+  const cropEditing = useToolStore((s) => s.cropEditing)
   const {
     setPlaying,
     setCurrentTime,
@@ -522,7 +523,7 @@ export function PreviewPlayer() {
         return
       }
 
-      if (activeTool === 'crop') {
+      if (activeTool === 'crop' && cropEditing) {
         if (!hit || hit.clipType !== 'media') return
         const layer = activeLayers.find((candidate) => candidate.clip.id === hit.id)
         const asset = layer?.asset
@@ -568,7 +569,16 @@ export function PreviewPlayer() {
         event.currentTarget.setPointerCapture(event.pointerId)
       }
     },
-    [activeLayers, activeTool, addTextClip, canvasPoint, selectClip, selectedClipId, splitClip]
+    [
+      activeLayers,
+      activeTool,
+      addTextClip,
+      canvasPoint,
+      cropEditing,
+      selectClip,
+      selectedClipId,
+      splitClip,
+    ]
   )
 
   const handlePointerMove = useCallback(

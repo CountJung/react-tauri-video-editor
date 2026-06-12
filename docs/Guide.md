@@ -41,9 +41,21 @@ For current verification, video media layers are drawn directly to the full prev
 (`0,0,canvasWidth,canvasHeight`) and ignore the clip fit mode. This keeps the entire decoded video
 frame visible while investigating fit-mode behavior.
 
+The media fit controls in the properties sidebar are disabled while this verification renderer is
+active. Crop controls are also hidden by default; choose the Crop tool and press the crop edit button
+before dragging or editing crop values.
+
 Primary media on the `video` track is treated as the base layer. When a project is loaded or the
 canvas output size changes, those clips are reframed to the full canvas. Overlay clips keep their own
 placement.
+
+### Timeline Layer Panel
+
+The timeline's left label column acts as the layer panel. Each track row exposes visibility, lock,
+track opacity, and a drag handle for layer ordering. These controls call `useTimelineStore`
+`updateTrackLayer` and `reorderTracks` actions through history-aware UI handlers.
+Tracks are grouped by layer family (`Media`, `Graphic`, `Audio`) for bulk visibility and lock
+toggles without changing the timeline data model.
 
 During playback, the preview must not seek the hidden `<video>` element on every timeline tick.
 Seeking is reserved for pause/scrub, clip changes, or large drift correction; otherwise Canvas draws

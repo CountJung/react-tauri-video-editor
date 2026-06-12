@@ -9,6 +9,7 @@ import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined'
 import ContentCutIcon from '@mui/icons-material/ContentCut'
 import CropIcon from '@mui/icons-material/Crop'
 import EastIcon from '@mui/icons-material/East'
+import EditIcon from '@mui/icons-material/Edit'
 import FitScreenIcon from '@mui/icons-material/FitScreen'
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'
 import MouseIcon from '@mui/icons-material/Mouse'
@@ -321,6 +322,7 @@ function SelectPanel() {
               size="small"
               variant="outlined"
               fullWidth
+              disabled
               startIcon={<FitScreenIcon sx={{ fontSize: 16 }} />}
               onClick={() => withHistory('클립을 캔버스에 맞춤', () => fitClipToCanvas(clip.id))}
               sx={{ justifyContent: 'flex-start', fontSize: 12 }}
@@ -332,6 +334,7 @@ function SelectPanel() {
             <TextField
               size="small"
               select
+              disabled
               value={clip.fitMode}
               onChange={(e) =>
                 updateClipCanvas(clip.id, { fitMode: e.target.value as typeof clip.fitMode })
@@ -346,6 +349,12 @@ function SelectPanel() {
               <MenuItem value="crop">crop — cropRect 사용</MenuItem>
             </TextField>
           </Row>
+          <Box sx={{ px: 1.5, pb: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              현재 비디오 프리뷰는 검증용으로 전체 캔버스에 고정 렌더되므로 맞춤 모드는 비활성화되어
+              있습니다.
+            </Typography>
+          </Box>
           {fitModesLookSame && (
             <Box sx={{ px: 1.5, pb: 1 }}>
               <Typography variant="caption" color="text.secondary">
@@ -572,38 +581,135 @@ function ShapePanel({ type }: { type: 'rect' | 'circle' | 'arrow' }) {
 }
 
 function CropPanel() {
+  const selectedClipId = useTimelineStore((s) => s.selectedClipId)
+  const tracks = useTimelineStore((s) => s.tracks)
+  const updateClipCanvas = useTimelineStore((s) => s.updateClipCanvas)
+  const cropEditing = useToolStore((s) => s.cropEditing)
+  const setCropEditing = useToolStore((s) => s.setCropEditing)
+
+  const clip = selectedClipId
+    ? tracks.flatMap((track) => track.clips).find((candidate) => candidate.id === selectedClipId)
+    : null
+  const cropRect = clip?.cropRect
+
+  const startEditing = () => {
+    setCropEditing(true)
+  }
+
+  const stopEditing = () => {
+    setCropEditing(false)
+  }
+
+  const updateCropRect = (update: Partial<NonNullable<typeof cropRect>>) => {
+    if (!clip) return
+    const next = {
+      x: cropRect?.x ?? 0,
+      y: cropRect?.y ?? 0,
+      width: cropRect?.width ?? Math.max(1, Math.round(clip.width)),
+      height: cropRect?.height ?? Math.max(1, Math.round(clip.height)),
+      ...update,
+    }
+    withHistory('자르기 영역 변경', () =>
+      updateClipCanvas(clip.id, {
+        fitMode: 'crop',
+        cropRect: next,
+      })
+    )
+  }
+
+  if (!clip || clip.clipType !== 'media') {
+    return (
+      <Box sx={{ px: 1.5, py: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          캔버스에서 미디어 클립을 선택한 뒤 자르기 편집을 시작하세요.
+        </Typography>
+      </Box>
+    )
+  }
+
   return (
     <>
       <SectionTitle>자르기 영역</SectionTitle>
-      <Row label="X">
-        <NumInput value={0} min={0} onChange={() => {}} unit="px" />
-      </Row>
-      <Row label="Y">
-        <NumInput value={0} min={0} onChange={() => {}} unit="px" />
-      </Row>
-      <Row label="W">
-        <NumInput value={1920} min={1} onChange={() => {}} unit="px" />
-      </Row>
-      <Row label="H">
-        <NumInput value={1080} min={1} onChange={() => {}} unit="px" />
-      </Row>
-      <SectionTitle>비율</SectionTitle>
-      <Box sx={{ px: 1.5, pb: 1 }}>
-        <ToggleButtonGroup
+      <Box sx={{ px: 1.5, pb: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Button
           size="small"
-          sx={{
-            flexWrap: 'wrap',
-            gap: 0.5,
-            '& .MuiToggleButton-root': { py: 0.25, px: 0.75, fontSize: 11 },
-          }}
+          variant={cropEditing ? 'contained' : 'outlined'}
+          startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+          onClick={cropEditing ? stopEditing : startEditing}
+          sx={{ justifyContent: 'flex-start', fontSize: 12 }}
         >
-          {['16:9', '9:16', '1:1', '4:3', '자유'].map((r) => (
-            <ToggleButton key={r} value={r}>
-              {r}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
+          {cropEditing ? '자르기 편집 종료' : '자르기 편집 시작'}
+        </Button>
+        <Typography variant="caption" color="text.secondary">
+          편집 시작 후 캔버스에서 드래그하면 crop 영역이 설정됩니다.
+        </Typography>
       </Box>
+
+      {!cropEditing && cropRect ? (
+        <Box sx={{ px: 1.5, pb: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            현재 crop: X {cropRect.x}, Y {cropRect.y}, W {cropRect.width}, H {cropRect.height}
+          </Typography>
+        </Box>
+      ) : null}
+
+      {cropEditing ? (
+        <>
+          <Row label="X">
+            <NumInput
+              value={cropRect?.x ?? 0}
+              min={0}
+              onChange={(value) => updateCropRect({ x: value })}
+              unit="px"
+            />
+          </Row>
+          <Row label="Y">
+            <NumInput
+              value={cropRect?.y ?? 0}
+              min={0}
+              onChange={(value) => updateCropRect({ y: value })}
+              unit="px"
+            />
+          </Row>
+          <Row label="W">
+            <NumInput
+              value={cropRect?.width ?? Math.round(clip.width)}
+              min={1}
+              onChange={(value) => updateCropRect({ width: value })}
+              unit="px"
+            />
+          </Row>
+          <Row label="H">
+            <NumInput
+              value={cropRect?.height ?? Math.round(clip.height)}
+              min={1}
+              onChange={(value) => updateCropRect({ height: value })}
+              unit="px"
+            />
+          </Row>
+        </>
+      ) : null}
+      {cropEditing ? (
+        <>
+          <SectionTitle>비율</SectionTitle>
+          <Box sx={{ px: 1.5, pb: 1 }}>
+            <ToggleButtonGroup
+              size="small"
+              sx={{
+                flexWrap: 'wrap',
+                gap: 0.5,
+                '& .MuiToggleButton-root': { py: 0.25, px: 0.75, fontSize: 11 },
+              }}
+            >
+              {['16:9', '9:16', '1:1', '4:3', '자유'].map((r) => (
+                <ToggleButton key={r} value={r} disabled>
+                  {r}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
+        </>
+      ) : null}
     </>
   )
 }

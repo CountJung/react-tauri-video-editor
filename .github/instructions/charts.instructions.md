@@ -41,3 +41,10 @@ type Clip  = { id: string; assetId: string; start: number; duration: number; tri
 
 - Timeline 트랙 레이아웃에 `@xyflow/react` 사용 시 `react-flow` SKILL.md 참조.
 - Custom Node = Clip, Custom Edge 사용 금지.
+
+## 6. 레이어 패널
+
+- 타임라인 왼쪽 레이블 영역은 레이어 패널로 사용한다.
+- 가시성/잠금/불투명도/순서 변경은 `useTimelineStore` 액션을 호출하고 히스토리에 기록한다.
+- 잠긴 트랙에는 에셋 드롭, 클립 이동, 트림을 허용하지 않는다.
+- `Media`, `Graphic`, `Audio` 그룹의 가시성/잠금 일괄 제어를 제공한다.

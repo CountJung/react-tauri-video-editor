@@ -60,6 +60,8 @@ export type TimelineState = {
 - 원본 비디오/이미지의 비율 맞춤은 `Clip.fitMode`가 담당한다. 기본값 `fit`은 클립 사각형 내부에 전체 소스를 보이게 letterbox/pillarbox로 그린다.
 - 프리뷰의 fit/fill 계산은 `ffprobe`/임포트 단계에서 얻은 에셋 `width`/`height`를 우선 사용하고, 없을 때만 브라우저 미디어 엘리먼트의 `videoWidth`/`naturalWidth`를 fallback으로 사용한다.
 - 현재 검증용 동작에서는 비디오 미디어 레이어를 `0,0,canvasWidth,canvasHeight`에 직접 그려 `fitMode`를 우회하고 전체 프레임을 항상 보이게 한다.
+- 이 검증용 동작이 활성화된 동안 우측 PropertiesPanel의 미디어 맞춤 모드는 비활성화한다.
+- Crop 도구의 cropRect 수치 제어와 캔버스 crop 드래그는 `자르기 편집 시작` 버튼을 누른 동안에만 활성화한다.
 - 원본 소스와 클립 사각형의 비율이 같으면 `fit`, `fill`, `stretch`가 육안상 동일하게 보일 수 있다. 이 경우 UI에서 소스/클립 비율이 같다는 안내를 표시해 동작하지 않는 것처럼 보이지 않게 한다.
 - 초기 배치 단계에서 소스 해상도 비율로 클립 사각형 자체를 줄이지 않는다. 그렇게 하면 `fitMode`가 중복 적용되어 프리뷰에서 영상 일부만 보이거나 속성 패널 좌표가 예상과 달라질 수 있다.
 - 사용자가 캔버스 출력 크기를 변경하면 full-canvas 미디어 클립은 새 캔버스 크기로 함께 보정한다.
@@ -73,6 +75,14 @@ export type TimelineState = {
 - 정지/스크럽 중에는 타임라인 위치에 맞게 즉시 seek한다.
 - 재생 중에는 클립이 바뀌거나 드리프트가 충분히 커진 경우에만 seek로 보정한다.
 - Canvas는 `requestAnimationFrame`에서 현재 video frame을 계속 `drawImage()`로 그리되, 시간 진행은 별도 타임라인 tick이 담당한다.
+
+### Layer Panel 규칙
+
+- 타임라인 왼쪽 레이블 영역은 레이어 패널로 동작한다.
+- 트랙 가시성, 잠금, 불투명도, 순서 변경은 `useTimelineStore.updateTrackLayer`와 `reorderTracks` 액션을 통해 처리한다.
+- 잠긴 트랙은 에셋 드롭, 클립 이동, 트림을 허용하지 않는다.
+- 레이어 순서 변경은 dnd-kit 드래그 데이터 `track-layer`를 사용하고 히스토리에 기록한다.
+- 트랙 그룹은 `Media`, `Graphic`, `Audio` 계열로 묶고, 그룹 가시성/잠금 토글도 히스토리에 기록한다.
 
 ---
 

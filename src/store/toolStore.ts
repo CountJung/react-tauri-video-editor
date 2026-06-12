@@ -19,9 +19,13 @@ export type ToolType = 'select' | 'text' | 'rect' | 'circle' | 'arrow' | 'crop' 
 export interface ToolStoreState {
   activeTool: ToolType
   setActiveTool: (tool: ToolType) => void
+  cropEditing: boolean
+  setCropEditing: (editing: boolean) => void
 }
 
 export const useToolStore = create<ToolStoreState>((set) => ({
   activeTool: 'select',
-  setActiveTool: (tool) => set({ activeTool: tool }),
+  cropEditing: false,
+  setActiveTool: (tool) => set({ activeTool: tool, cropEditing: false }),
+  setCropEditing: (editing) => set({ cropEditing: editing }),
 }))
