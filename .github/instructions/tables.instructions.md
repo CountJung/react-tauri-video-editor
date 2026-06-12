@@ -28,6 +28,10 @@ type Asset = {
 - 에셋 패널은 파일 드롭 영역 — Tauri `drag-drop` 이벤트 수신.
 - 파일 유효성(확장자) 검사는 Rust 측 `asset_import` command에서 처리.
 - 임포트 후 `useAssetStore`(Zustand)에 에셋 추가.
+- Vite 웹 검증 환경에서는 Tauri 파일 경로 이벤트가 없으므로 native `DataTransfer.files`
+  / hidden file input fallback으로 `blob:` URL 에셋을 생성한다.
+- 브라우저 fallback 에셋은 `<video>/<audio>/<img>` 메타데이터를 읽어 `duration`, `width`,
+  `height`를 채우고, 미디어 표시 시 `blob:` URL을 `convertFileSrc`로 감싸지 않는다.
 
 ## 3. 썸네일
 

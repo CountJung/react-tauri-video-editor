@@ -1,4 +1,4 @@
-import { convertFileSrc } from '@/lib/invoke'
+import { getDisplayableMediaSrc } from '@/lib/mediaSource'
 import type { Asset, Clip, Track } from '@/store/timelineStore'
 
 export interface ActiveLayer {
@@ -16,6 +16,32 @@ export interface DrawRect {
   dy: number
   dw: number
   dh: number
+}
+
+export function getContainedCanvasDisplaySize(
+  canvasWidth: number,
+  canvasHeight: number,
+  availableWidth: number,
+  availableHeight: number,
+  maxScale?: number | null
+): { width: number; height: number } {
+  const fitScale = Math.min(availableWidth / canvasWidth, availableHeight / canvasHeight)
+  const scale = Math.min(fitScale, maxScale ?? fitScale)
+  return {
+    width: Math.max(1, Math.round(canvasWidth * scale)),
+    height: Math.max(1, Math.round(canvasHeight * scale)),
+  }
+}
+
+export function getMediaSourceSize(
+  asset: Pick<Asset, 'width' | 'height'>,
+  mediaSize: { width?: number; height?: number },
+  clip: Pick<Clip, 'width' | 'height'>
+): { width: number; height: number } {
+  return {
+    width: asset.width || mediaSize.width || clip.width,
+    height: asset.height || mediaSize.height || clip.height,
+  }
 }
 
 export function getClipLocalTime(clip: Clip, timelineTime: number): number {
@@ -257,5 +283,5 @@ export function hitTestLayers(layers: ActiveLayer[], x: number, y: number): Clip
 }
 
 export function getAssetUrl(asset: Asset): string {
-  return convertFileSrc(asset.path)
+  return getDisplayableMediaSrc(asset.path)
 }

@@ -1,4 +1,5 @@
-import { convertFileSrc, tauriInvoke, tauriListen } from '@/lib/invoke'
+import { isTauriRuntime, tauriInvoke, tauriListen } from '@/lib/invoke'
+import { getDisplayableMediaSrc } from '@/lib/mediaSource'
 import { useAssetStore } from '@/store/assetStore'
 import type { Asset } from '@/store/timelineStore'
 import { useDraggable } from '@dnd-kit/core'
@@ -15,7 +16,7 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { appLocalDataDir, join } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface AssetMeta {
   id: string
@@ -30,6 +31,119 @@ interface AssetMeta {
 interface AppErrorLike {
   code?: string
   message?: string
+}
+
+const MEDIA_EXTENSIONS = [
+  'mp4',
+  'mov',
+  'avi',
+  'mkv',
+  'webm',
+  'mp3',
+  'wav',
+  'aac',
+  'flac',
+  'ogg',
+  'm4a',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+] as const
+
+const MEDIA_ACCEPT = MEDIA_EXTENSIONS.map((extension) => `.${extension}`).join(',')
+const WEB_METADATA_TIMEOUT_MS = 5000
+
+function getAssetTypeFromFile(file: File): Asset['type'] | null {
+  if (file.type.startsWith('video/')) return 'video'
+  if (file.type.startsWith('audio/')) return 'audio'
+  if (file.type.startsWith('image/')) return 'image'
+
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (!ext) return null
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video'
+  if (['mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a'].includes(ext)) return 'audio'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) return 'image'
+  return null
+}
+
+function hashString(value: string): string {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = Math.imul(31, hash) + value.charCodeAt(i)
+  }
+  return Math.abs(hash).toString(36)
+}
+
+function finiteDuration(value: number, fallback: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback
+}
+
+function loadWebAssetMetadata(
+  url: string,
+  type: Asset['type']
+): Promise<Pick<Asset, 'duration' | 'width' | 'height'>> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error('metadata timeout'))
+    }, WEB_METADATA_TIMEOUT_MS)
+
+    const done = (metadata: Pick<Asset, 'duration' | 'width' | 'height'>) => {
+      window.clearTimeout(timeout)
+      resolve(metadata)
+    }
+    const fail = () => {
+      window.clearTimeout(timeout)
+      reject(new Error('metadata load failed'))
+    }
+
+    if (type === 'image') {
+      const image = new Image()
+      image.onload = () =>
+        done({ duration: 0, width: image.naturalWidth, height: image.naturalHeight })
+      image.onerror = fail
+      image.src = url
+      return
+    }
+
+    const media =
+      type === 'audio' ? document.createElement('audio') : document.createElement('video')
+    media.preload = 'metadata'
+    media.onloadedmetadata = () =>
+      done({
+        duration: finiteDuration(media.duration, type === 'audio' ? 0 : 5),
+        width: type === 'video' ? (media as HTMLVideoElement).videoWidth : undefined,
+        height: type === 'video' ? (media as HTMLVideoElement).videoHeight : undefined,
+      })
+    media.onerror = fail
+    media.src = url
+  })
+}
+
+async function createWebAssetFromFile(file: File): Promise<Asset> {
+  const type = getAssetTypeFromFile(file)
+  if (!type) throw new Error('지원하지 않는 파일 형식입니다.')
+
+  const url = URL.createObjectURL(file)
+  try {
+    const metadata = await loadWebAssetMetadata(url, type)
+    const id = `web-${hashString(`${file.name}:${file.size}:${file.lastModified}:${file.type}`)}`
+    return {
+      id,
+      type,
+      path: url,
+      name: file.name,
+      duration: metadata.duration,
+      width: metadata.width,
+      height: metadata.height,
+      thumbnailPath: type === 'image' ? url : undefined,
+    }
+  } catch (error) {
+    URL.revokeObjectURL(url)
+    throw error
+  }
 }
 
 function isDialogCanceled(error: unknown): boolean {
@@ -123,7 +237,7 @@ function DraggableAssetItem({
         ) : asset.thumbnailPath ? (
           <Box
             component="img"
-            src={convertFileSrc(asset.thumbnailPath)}
+            src={getDisplayableMediaSrc(asset.thumbnailPath)}
             alt=""
             sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
@@ -156,6 +270,7 @@ function DraggableAssetItem({
 
 /** 에셋 패널 — 파일 임포트 및 목록 표시 (Phase 1) */
 export function AssetPanel() {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -166,6 +281,22 @@ export function AssetPanel() {
     setErrorMessage(message)
   }, [])
 
+  const handleWebFiles = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        try {
+          const asset = await createWebAssetFromFile(file)
+          addAsset(asset)
+          setSelectedAsset(asset.id)
+        } catch (error) {
+          const reason = toErrorMessage(error, '파일을 추가하지 못했습니다.')
+          showError(`파일 추가 실패: ${reason}`)
+        }
+      }
+    },
+    [addAsset, setSelectedAsset, showError]
+  )
+
   const handleFilePaths = useCallback(
     async (paths: string[]) => {
       for (const filePath of paths) {
@@ -175,7 +306,6 @@ export function AssetPanel() {
           basicMeta = await tauriInvoke<AssetMeta>('asset_import', { path: filePath })
         } catch (error) {
           const reason = toErrorMessage(error, '파일을 추가하지 못했습니다.')
-          console.error('[AssetPanel] asset_import failed:', { filePath, error })
           showError(`파일 추가 실패: ${reason}`)
           continue
         }
@@ -216,11 +346,7 @@ export function AssetPanel() {
                 // 썸네일 생성 실패 시 무시 (FFmpeg 미설치 환경)
               }
             }
-          } catch (error) {
-            console.warn('[AssetPanel] asset_probe failed, keep basic metadata:', {
-              filePath,
-              error,
-            })
+          } catch {
             // ffprobe 실패 시 기본 메타 유지
           } finally {
             setLoadingIds((prev) => {
@@ -285,31 +411,18 @@ export function AssetPanel() {
   }, [handleFilePaths])
 
   const handleOpenDialog = async () => {
+    if (!isTauriRuntime()) {
+      fileInputRef.current?.click()
+      return
+    }
+
     try {
       const result = await open({
         multiple: true,
         filters: [
           {
             name: 'Media Files',
-            extensions: [
-              'mp4',
-              'mov',
-              'avi',
-              'mkv',
-              'webm',
-              'mp3',
-              'wav',
-              'aac',
-              'flac',
-              'ogg',
-              'm4a',
-              'png',
-              'jpg',
-              'jpeg',
-              'gif',
-              'webp',
-              'bmp',
-            ],
+            extensions: [...MEDIA_EXTENSIONS],
           },
         ],
       })
@@ -319,13 +432,50 @@ export function AssetPanel() {
     } catch (error) {
       if (isDialogCanceled(error)) return
       const reason = toErrorMessage(error, '파일 선택 창을 열지 못했습니다.')
-      console.error('[AssetPanel] open dialog failed:', error)
       showError(`파일 선택 실패: ${reason}`)
     }
   }
 
+  const handleFileInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.currentTarget.files ?? [])
+      event.currentTarget.value = ''
+      if (files.length > 0) void handleWebFiles(files)
+    },
+    [handleWebFiles]
+  )
+
+  const handleNativeDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (isTauriRuntime() || !Array.from(event.dataTransfer.types).includes('Files')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsDragging(true)
+  }, [])
+
+  const handleNativeDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (isTauriRuntime()) return
+    const nextTarget = event.relatedTarget
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return
+    setIsDragging(false)
+  }, [])
+
+  const handleNativeDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (isTauriRuntime()) return
+      const files = Array.from(event.dataTransfer.files ?? [])
+      if (files.length === 0) return
+      event.preventDefault()
+      setIsDragging(false)
+      void handleWebFiles(files)
+    },
+    [handleWebFiles]
+  )
+
   return (
     <Box
+      onDragOver={handleNativeDragOver}
+      onDragLeave={handleNativeDragLeave}
+      onDrop={handleNativeDrop}
       sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -337,6 +487,15 @@ export function AssetPanel() {
         transition: 'outline 0.1s',
       }}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={MEDIA_ACCEPT}
+        multiple
+        hidden
+        onChange={handleFileInputChange}
+      />
+
       {/* 헤더 */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
         <Typography variant="caption" sx={{ flex: 1, color: 'text.secondary', fontWeight: 'bold' }}>

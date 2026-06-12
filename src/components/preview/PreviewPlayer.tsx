@@ -24,6 +24,8 @@ import {
   drawTextClip,
   getAssetUrl,
   getClipLocalTime,
+  getContainedCanvasDisplaySize,
+  getMediaSourceSize,
   hitTestLayers,
   withClipTransform,
 } from './canvasCompositor'
@@ -213,7 +215,7 @@ export function PreviewPlayer() {
     'fit',
     STORAGE_KEYS.PREVIEW_CANVAS_ZOOM
   )
-  const fixedPreviewScale = previewZoom === 'fit' ? null : Number(previewZoom) / 100
+  const previewMaxScale = previewZoom === 'fit' ? null : Number(previewZoom) / 100
   const [fitCanvasSize, setFitCanvasSize] = useState({ width: canvasWidth, height: canvasHeight })
 
   useEffect(() => {
@@ -228,14 +230,6 @@ export function PreviewPlayer() {
   }, [duration])
 
   useEffect(() => {
-    if (fixedPreviewScale) {
-      setFitCanvasSize({
-        width: canvasWidth * fixedPreviewScale,
-        height: canvasHeight * fixedPreviewScale,
-      })
-      return
-    }
-
     const viewport = previewViewportRef.current
     if (!viewport) return
 
@@ -245,18 +239,22 @@ export function PreviewPlayer() {
       const paddingY = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
       const availableWidth = Math.max(1, viewport.clientWidth - paddingX)
       const availableHeight = Math.max(1, viewport.clientHeight - paddingY)
-      const scale = Math.min(availableWidth / canvasWidth, availableHeight / canvasHeight)
-      setFitCanvasSize({
-        width: Math.max(1, Math.round(canvasWidth * scale)),
-        height: Math.max(1, Math.round(canvasHeight * scale)),
-      })
+      setFitCanvasSize(
+        getContainedCanvasDisplaySize(
+          canvasWidth,
+          canvasHeight,
+          availableWidth,
+          availableHeight,
+          previewMaxScale
+        )
+      )
     }
 
     updateSize()
     const observer = new ResizeObserver(updateSize)
     observer.observe(viewport)
     return () => observer.disconnect()
-  }, [canvasWidth, canvasHeight, fixedPreviewScale])
+  }, [canvasWidth, canvasHeight, previewMaxScale])
 
   const activeLayers = useMemo(
     () => collectActiveLayers(tracks, assets, storeCurrentTime),
@@ -390,29 +388,29 @@ export function PreviewPlayer() {
 
       for (const layer of activeLayersRef.current) {
         const { clip, track, asset } = layer
+        if (clip.clipType === 'media' && asset?.type === 'video') {
+          const video = videoCacheRef.current.get(asset.id)
+          if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            ctx.save()
+            ctx.globalAlpha = Math.max(0, Math.min(1, clip.opacity * track.opacity))
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+            ctx.restore()
+          }
+          continue
+        }
+
         withClipTransform(ctx, clip, track.opacity, () => {
           if (clip.clipType === 'text') drawTextClip(ctx, clip)
           else if (clip.clipType === 'shape') drawShapeClip(ctx, clip)
           else if (asset?.type === 'image') {
             const img = imageCacheRef.current.get(asset.id)
-            if (img?.complete)
-              drawImageLike(
-                ctx,
-                img,
-                img.naturalWidth || asset.width || clip.width,
-                img.naturalHeight || asset.height || clip.height,
+            if (img?.complete) {
+              const source = getMediaSourceSize(
+                asset,
+                { width: img.naturalWidth, height: img.naturalHeight },
                 clip
               )
-          } else if (asset?.type === 'video') {
-            const video = videoCacheRef.current.get(asset.id)
-            if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-              drawImageLike(
-                ctx,
-                video,
-                video.videoWidth || asset.width || clip.width,
-                video.videoHeight || asset.height || clip.height,
-                clip
-              )
+              drawImageLike(ctx, img, source.width, source.height, clip)
             }
           }
         })
@@ -699,7 +697,7 @@ export function PreviewPlayer() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          overflow: fixedPreviewScale ? 'auto' : 'hidden',
+          overflow: 'hidden',
           minHeight: 0,
           position: 'relative',
           p: 1,
@@ -707,15 +705,15 @@ export function PreviewPlayer() {
       >
         <Box
           sx={{
-            width: fixedPreviewScale ? 'max-content' : '100%',
-            height: fixedPreviewScale ? 'max-content' : '100%',
+            width: '100%',
+            height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
             overflow: 'visible',
-            minWidth: fixedPreviewScale ? canvasWidth * fixedPreviewScale : 0,
-            minHeight: fixedPreviewScale ? canvasHeight * fixedPreviewScale : 0,
+            minWidth: 0,
+            minHeight: 0,
           }}
         >
           {activeLayers.length === 0 && (
@@ -746,8 +744,8 @@ export function PreviewPlayer() {
               display: 'block',
               width: fitCanvasSize.width,
               height: fitCanvasSize.height,
-              maxWidth: fixedPreviewScale ? 'none' : '100%',
-              maxHeight: fixedPreviewScale ? 'none' : '100%',
+              maxWidth: '100%',
+              maxHeight: '100%',
               aspectRatio: `${canvasWidth} / ${canvasHeight}`,
               outline: '1px solid rgba(255,255,255,0.16)',
               cursor: dragRef.current ? 'grabbing' : 'default',

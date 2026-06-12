@@ -2,7 +2,15 @@ import type { Asset, Clip, Track } from '@/store/timelineStore'
 import { getDefaultMediaClipRect } from '@/store/timelineStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { describe, expect, it } from 'vitest'
-import { collectActiveLayers, getFitDrawRect, hitTestClip, hitTestLayers } from './canvasCompositor'
+import {
+  collectActiveLayers,
+  getAssetUrl,
+  getContainedCanvasDisplaySize,
+  getFitDrawRect,
+  getMediaSourceSize,
+  hitTestClip,
+  hitTestLayers,
+} from './canvasCompositor'
 
 function clip(overrides: Partial<Clip> = {}): Clip {
   return {
@@ -193,6 +201,33 @@ describe('canvas compositor helpers', () => {
       dy: 236.25,
       dw: 1080,
       dh: 607.5,
+    })
+  })
+
+  it('keeps browser object URLs displayable without Tauri asset conversion', () => {
+    expect(getAssetUrl({ ...asset, path: 'blob:http://127.0.0.1:1420/test-video' })).toBe(
+      'blob:http://127.0.0.1:1420/test-video'
+    )
+  })
+
+  it('prefers probed asset dimensions for video fit calculations', () => {
+    expect(getMediaSourceSize(asset, { width: 1440, height: 1080 }, clip())).toEqual({
+      width: 1920,
+      height: 1080,
+    })
+  })
+
+  it('caps fixed preview zoom so the full canvas remains visible', () => {
+    expect(getContainedCanvasDisplaySize(1920, 1080, 960, 540, 1)).toEqual({
+      width: 960,
+      height: 540,
+    })
+  })
+
+  it('uses the requested fixed preview zoom when it fits the viewport', () => {
+    expect(getContainedCanvasDisplaySize(1920, 1080, 2200, 1400, 1)).toEqual({
+      width: 1920,
+      height: 1080,
     })
   })
 

@@ -58,10 +58,13 @@ export type TimelineState = {
 - 미디어 클립을 처음 추가할 때 `x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`로 캔버스 전체를 차지하게 한다.
 - `video` 트랙의 미디어 클립은 베이스 영상으로 취급한다. 프로젝트 로드, 캔버스 크기 변경, 레거시 상태 보정 시 `x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`로 강제 복구한다.
 - 원본 비디오/이미지의 비율 맞춤은 `Clip.fitMode`가 담당한다. 기본값 `fit`은 클립 사각형 내부에 전체 소스를 보이게 letterbox/pillarbox로 그린다.
+- 프리뷰의 fit/fill 계산은 `ffprobe`/임포트 단계에서 얻은 에셋 `width`/`height`를 우선 사용하고, 없을 때만 브라우저 미디어 엘리먼트의 `videoWidth`/`naturalWidth`를 fallback으로 사용한다.
+- 현재 검증용 동작에서는 비디오 미디어 레이어를 `0,0,canvasWidth,canvasHeight`에 직접 그려 `fitMode`를 우회하고 전체 프레임을 항상 보이게 한다.
 - 원본 소스와 클립 사각형의 비율이 같으면 `fit`, `fill`, `stretch`가 육안상 동일하게 보일 수 있다. 이 경우 UI에서 소스/클립 비율이 같다는 안내를 표시해 동작하지 않는 것처럼 보이지 않게 한다.
 - 초기 배치 단계에서 소스 해상도 비율로 클립 사각형 자체를 줄이지 않는다. 그렇게 하면 `fitMode`가 중복 적용되어 프리뷰에서 영상 일부만 보이거나 속성 패널 좌표가 예상과 달라질 수 있다.
 - 사용자가 캔버스 출력 크기를 변경하면 full-canvas 미디어 클립은 새 캔버스 크기로 함께 보정한다.
 - 프리뷰 표시 배율(`preview:canvas:zoom`)은 편집기에서 보이는 크기만 바꾸며, `canvasWidth`/`canvasHeight` 출력 해상도와 섞지 않는다.
+- 프리뷰 표시 배율은 뷰포트보다 커져서 캔버스 일부만 스크롤로 보이는 상태를 만들지 않는다. `100%` 같은 고정 배율도 화면 공간이 부족하면 전체 캔버스가 보이는 크기로 자동 제한한다.
 - 기존 프로젝트나 HMR 상태에서 full-canvas 미디어 클립의 `x`/`y`가 음수로 남을 수 있으므로, 로드·캔버스 크기 변경·수동 "캔버스 전체에 맞춤" 동작에서 `x=0`, `y=0`으로 복구한다.
 
 ### Canvas 비디오 재생 동기화 규칙

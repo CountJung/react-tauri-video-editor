@@ -25,11 +25,21 @@ The preview canvas has two independent size controls:
 - Output canvas size: edit W/H in the Select tool properties panel. This updates the project canvas
   dimensions and keeps full-canvas media clips aligned to the new frame.
 - Display zoom: use the preview overlay selector (`맞춤`, `25%`, `50%`, `75%`, `100%`, `150%`).
-  This changes only how large the canvas appears in the editor, not the export resolution.
+  This changes only how large the canvas appears in the editor, not the export resolution. Fixed
+  zoom options are capped by the viewport size so the full canvas stays visible instead of becoming
+  a scrollable cropped view.
 
 When a video or image asset is first dropped onto a media track, its clip frame is initialized to the
 full project canvas (`x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`). The clip `fitMode`
 then controls how the source media is drawn inside that frame.
+
+Fit calculations use the probed asset dimensions first, then browser element dimensions as a
+fallback. This prevents a browser-decoded `<video>` size mismatch from making the preview look
+zoomed or side-cropped when the source is actually the same size as the project canvas.
+
+For current verification, video media layers are drawn directly to the full preview canvas
+(`0,0,canvasWidth,canvasHeight`) and ignore the clip fit mode. This keeps the entire decoded video
+frame visible while investigating fit-mode behavior.
 
 Primary media on the `video` track is treated as the base layer. When a project is loaded or the
 canvas output size changes, those clips are reframed to the full canvas. Overlay clips keep their own
@@ -38,6 +48,18 @@ placement.
 During playback, the preview must not seek the hidden `<video>` element on every timeline tick.
 Seeking is reserved for pause/scrub, clip changes, or large drift correction; otherwise Canvas draws
 the live decoded video frame each animation frame.
+
+### Browser Asset Import Fallback
+
+In Tauri, external file drops are handled through `tauri://drag-drop` and real filesystem paths are
+imported with the `asset_import` command. In the plain Vite browser at `http://127.0.0.1:1420`,
+those Tauri events and paths do not exist. The asset panel therefore also accepts native browser
+`DataTransfer.files` drops and the hidden file input used by the add button.
+
+Browser-imported assets use temporary `blob:` URLs. The preview source helper must pass `blob:`,
+`data:`, and HTTP(S) URLs through unchanged, while local filesystem paths continue to go through
+Tauri `convertFileSrc`. This keeps web verification media visible without changing desktop import
+behavior.
 
 When verifying the local UI from Codex, open `http://127.0.0.1:1420` with the in-app browser first.
 If that browser is unavailable, retry the same URL with Playwright MCP and report any remaining

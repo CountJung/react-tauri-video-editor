@@ -334,7 +334,11 @@
 - [ ] **Undo/Redo 후 dirty 정책 정리** — undo/redo 실행 후 저장 필요 상태와 저장 직후 history 정책 결정
 - [x] **브라우저 개발 모드 Tauri guard** — Vite 브라우저 실행 시 `window.__TAURI__` 부재를 명확히 처리하고 IPC 버튼을 mock/disable
 - [x] **브라우저 검증 fallback 지침화** — Codex 인앱 브라우저 실패 시 Playwright MCP로 `127.0.0.1:1420` 재시도
+- [x] **브라우저 AssetPanel 파일 추가 fallback** — Vite 웹 환경에서 native file drop/input으로 `blob:` URL 에셋을 생성하고 프리뷰 URL 변환을 우회
 - [x] **fitMode 동일 비율 안내** — 원본 소스와 클립 프레임 비율이 같아 맞춤 모드 차이가 보이지 않는 경우 속성 패널에서 안내
+- [x] **프리뷰 fit 계산 기준 수정** — 브라우저 videoWidth 불일치보다 ffprobe 에셋 W/H를 우선해 전체 영상 영역이 보이도록 보정
+- [x] **프리뷰 고정 배율 전체 보기 보장** — 100% 같은 표시 배율이 뷰포트보다 크면 자동 축소해 캔버스 일부만 보이는 스크롤 상태 방지
+- [x] **검증용 비디오 전체 캔버스 고정 렌더** — fitMode를 우회하고 비디오 프레임을 `0,0,canvasWidth,canvasHeight`에 직접 그려 표시 확인
 - [ ] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
 - [ ] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
 - [x] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결
