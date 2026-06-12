@@ -1,4 +1,4 @@
 interface:
   display_name: "Project Structure Review Agent"
-  short_description: "Split oversized source files safely."
-  default_prompt: "Use $project-structure-review-agent to review source files over 1000 lines and split responsibilities according to this project's architecture."
+  short_description: "Split oversized source files and large Vite chunks safely."
+  default_prompt: "Use $project-structure-review-agent to review source files over 1000 lines or Vite 500kB+ chunk warnings, then propose or perform architecture-aligned splits using lazy loading/code splitting before merely raising warning limits."

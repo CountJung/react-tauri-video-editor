@@ -55,7 +55,9 @@ applyTo: "src/components/**,src/routes/**,src/context/**"
 ## 8. 라우팅
 
 - 파일 기반 라우트 (`src/routes/`) — `routeTree.gen.ts` 수동 편집 금지.
-- 새 라우트 추가 시 `docs/project-map.md` 라우트 구조 업데이트.
+- 새 라우트 추가 시 루트 `PROJECT_MAP.md` 라우트 구조 업데이트.
+- 라우트 파일은 가능한 얇게 유지하고, 무거운 화면 본문은 `React.lazy`/동적 `import()`로 `src/components/<domain>/` 컴포넌트에 위임한다.
+- `pnpm build:vite`에서 500kB+ chunk 경고가 나오면 route body, dialog, editor panel, settings 화면을 우선 lazy-load 후보로 검토한다.
 
 ## 9. Drag & Drop (React Flow + dnd-kit)
 

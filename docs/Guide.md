@@ -49,6 +49,13 @@ Primary media on the `video` track is treated as the base layer. When a project 
 canvas output size changes, those clips are reframed to the full canvas. Overlay clips keep their own
 placement.
 
+### Build Chunk Splitting
+
+`pnpm build:vite` should not leave JavaScript chunks above Vite's default 500 kB warning threshold.
+When a warning appears, review the affected route or component with the project structure review
+rules and prefer lazy-loading route bodies, dialogs, editor panels, media tools, and settings screens
+before changing `build.chunkSizeWarningLimit`.
+
 ### Timeline Layer Panel
 
 The timeline's left label column acts as the layer panel. Each track row exposes visibility, lock,

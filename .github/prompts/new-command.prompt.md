@@ -9,7 +9,7 @@ agent: "agent"
 
 관련 스킬: [tauri-backend](../.github/skills/tauri-backend/SKILL.md), [rust-skills](../.github/skills/rust-skills/SKILL.md)
 
-프로젝트 맵: [docs/project-map.md](../../docs/project-map.md)
+프로젝트 맵: [PROJECT_MAP.md](../../PROJECT_MAP.md)
 
 ---
 
@@ -111,7 +111,7 @@ import { tauriInvoke } from "../../lib/invoke";
 const items = await tauriInvoke<MyItemDto[]>("my_item_list");
 ```
 
-### 6. docs/project-map.md §3 커맨드 맵 업데이트
+### 6. PROJECT_MAP.md 커맨드 맵 업데이트
 
 ```md
 | `my_domain.rs` | `my_item_list`, `my_item_get` | 내 도메인 |
@@ -129,4 +129,4 @@ const items = await tauriInvoke<MyItemDto[]>("my_item_list");
 - [ ] DB 쿼리 `log::info!` 로깅
 - [ ] 환경변수 하드코딩 없음
 - [ ] `cargo check` / `cargo clippy` 경고 0
-- [ ] `docs/project-map.md` 커맨드 맵 업데이트
+- [ ] `PROJECT_MAP.md` 커맨드 맵 업데이트

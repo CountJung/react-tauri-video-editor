@@ -26,6 +26,8 @@ React + Tauri 기반 데스크톱 비디오 에디터.
 | 9 | 에러·경고 무시 금지 (`#[allow(...)]` / `@ts-ignore` 무조건 억제 금지) |
 | 10 | 소스 변경 시 관련 문서·스킬 동기화 필수 |
 | 11 | **기능 구현 완료 즉시 `TODO.md` 해당 항목을 `[x]`로 체크** — 세션 종료 전 미체크 금지 |
+| 12 | Vite 500kB+ chunk 경고 발생 시 lazy loading/code splitting 검토를 프로젝트 구조 리뷰 에이전트 역할로 수행 |
+| 13 | 코드 검색 전 루트 `PROJECT_MAP.md`를 먼저 확인하고, 구조 변경 시 같은 작업에서 갱신 |
 
 ---
 
@@ -34,14 +36,25 @@ React + Tauri 기반 데스크톱 비디오 에디터.
 이 저장소의 GitHub Copilot 지침·스킬은 Codex에서도 같은 효과를 내도록 **공통 지침 원천**으로 사용한다. Codex/OpenAI 기반 에이전트는 `AGENTS.md`를 진입점으로 삼고, 작업 전 아래 파일을 수동으로 적용한다.
 
 1. 항상 `.github/copilot-instructions.md`를 공통 핵심 지침으로 확인한다.
-2. 수정 대상 경로가 `.github/instructions/*.instructions.md`의 `applyTo` 범위에 걸리면 해당 파일을 함께 확인한다.
-3. 작업 도메인에 맞는 `.github/skills/**/SKILL.md`를 먼저 읽고, 그 절차·금지사항·검증 기준을 따른다.
-4. React Flow 작업은 `.agents/skills/react-flow/SKILL.md`와 필요 reference를 확인한다.
-5. 레퍼런스 에이전트 중 이 프로젝트에 맞는 리뷰 계열 스킬만 `.agents/skills/*/agents/openai.yaml` 형태로 설치한다. 사용자가 `$code-review-agent` 같은 이름을 명시하면 해당 `.agents/skills/<name>/SKILL.md`를 먼저 읽고 적용한다.
-6. 코드 리뷰·오류 수정 요청은 `.github/agents/code-review.agent.md`와 `.agents/skills/code-review-agent/SKILL.md`를 Codex용 체크리스트로 함께 사용한다.
-7. 새 라우트·새 Tauri command 스캐폴딩 작업은 `.github/prompts/*.prompt.md` 템플릿을 참조한다.
+2. 코드 검색이나 파일 탐색 전에 루트 `PROJECT_MAP.md`를 확인하고, 그 맵을 기준으로 대상 파일을 좁힌다.
+3. 수정 대상 경로가 `.github/instructions/*.instructions.md`의 `applyTo` 범위에 걸리면 해당 파일을 함께 확인한다.
+4. 작업 도메인에 맞는 `.github/skills/**/SKILL.md`를 먼저 읽고, 그 절차·금지사항·검증 기준을 따른다.
+5. React Flow 작업은 `.agents/skills/react-flow/SKILL.md`와 필요 reference를 확인한다.
+6. 레퍼런스 에이전트 중 이 프로젝트에 맞는 리뷰 계열 스킬만 `.agents/skills/*/agents/openai.yaml` 형태로 설치한다. 사용자가 `$code-review-agent` 같은 이름을 명시하면 해당 `.agents/skills/<name>/SKILL.md`를 먼저 읽고 적용한다.
+7. 코드 리뷰·오류 수정 요청은 `.github/agents/code-review.agent.md`와 `.agents/skills/code-review-agent/SKILL.md`를 Codex용 체크리스트로 함께 사용한다.
+8. Vite build 500kB+ chunk 경고가 발생하면 `.agents/skills/project-structure-review-agent/SKILL.md`를 적용해 route/dialog/editor panel/settings 화면의 lazy loading 분리를 우선 검토한다.
+9. 새 라우트·새 Tauri command 스캐폴딩 작업은 `.github/prompts/*.prompt.md` 템플릿을 참조한다.
 
 Copilot 전용 표현(예: `applyTo` 자동 적용, Copilot Chat 명령, 커스텀 에이전트 호출)은 Codex에서 직접 실행되지 않을 수 있다. 이 경우 같은 의도를 Codex 도구로 수행한다. 예를 들어 `applyTo`는 파일 경로 기준 수동 매칭으로, Code Review 에이전트는 체크리스트 기반 자체 리뷰로, `/graphify`는 `graphify-out/GRAPH_REPORT.md` 존재 여부 확인으로 대체한다.
+
+---
+
+## 프로젝트 맵
+
+- **프로젝트 전체 구조 맵** → `PROJECT_MAP.md` (루트)
+- 모든 에이전트는 코드 검색 전에 `PROJECT_MAP.md`를 먼저 확인한다.
+- 파일·폴더·라우트·Tauri command·store·주요 컴포넌트가 추가/이동/삭제되면 같은 작업에서 `PROJECT_MAP.md`를 갱신한다.
+- `graphify-out/GRAPH_REPORT.md`가 있으면 `PROJECT_MAP.md` 확인 후 보조 자료로 사용한다.
 
 ---
 
@@ -146,7 +159,7 @@ GitHub Copilot은 `applyTo`로 자동 적용하고, Codex는 수정 대상 경�
 | `ui.instructions.md` | `src/components/**`, `src/routes/**` |
 | `charts.instructions.md` (→ timeline) | `src/components/timeline/**` |
 | `tables.instructions.md` (→ assets) | `src/components/assets/**` |
-| `docs.instructions.md` | `docs/**`, `AGENTS.md`, `.github/**` |
+| `docs.instructions.md` | `docs/**`, `PROJECT_MAP.md`, `AGENTS.md`, `.github/**` |
 
 ---
 
@@ -159,6 +172,7 @@ GitHub Copilot은 `applyTo`로 자동 적용하고, Codex는 수정 대상 경�
 - [ ] 하드코딩된 경로·값이 없는가?
 - [ ] `cargo clippy` / Biome 경고가 0인가?
 - [ ] 관련 문서·스킬 파일을 업데이트했는가?
+- [ ] 구조 변경 시 `PROJECT_MAP.md`를 업데이트했는가?
 - [ ] 라이브러리 API 사용 전 `mcp_context7_query-docs`로 최신 버전 확인했는가?
 
 ---

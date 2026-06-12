@@ -185,6 +185,8 @@ export function PreviewPlayer() {
   const playLastTsRef = useRef<number | null>(null)
   const currentTimeRef = useRef(storeCurrentTime)
   const durationRef = useRef(duration)
+  const activeToolRef = useRef(activeTool)
+  const cropEditingRef = useRef(cropEditing)
   const videoCacheRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const videoSyncKeyRef = useRef<Map<string, string>>(new Map())
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
@@ -229,6 +231,14 @@ export function PreviewPlayer() {
   useEffect(() => {
     durationRef.current = duration
   }, [duration])
+
+  useEffect(() => {
+    activeToolRef.current = activeTool
+  }, [activeTool])
+
+  useEffect(() => {
+    cropEditingRef.current = cropEditing
+  }, [cropEditing])
 
   useEffect(() => {
     const viewport = previewViewportRef.current
@@ -417,7 +427,9 @@ export function PreviewPlayer() {
         })
       }
 
-      if (selectedClipRef.current) drawSelection(ctx, selectedClipRef.current)
+      const shouldDrawSelection = activeToolRef.current === 'crop' && cropEditingRef.current
+      if (selectedClipRef.current && shouldDrawSelection)
+        drawSelection(ctx, selectedClipRef.current)
       rafRef.current = requestAnimationFrame(draw)
     }
     rafRef.current = requestAnimationFrame(draw)
@@ -541,6 +553,7 @@ export function PreviewPlayer() {
       }
 
       selectClip(hit?.id ?? null)
+      if (activeTool !== 'select') return
       if (hit) {
         const selectedHandle =
           selectedClipId === hit.id ? getResizeHandle(hit, point.x, point.y) : null

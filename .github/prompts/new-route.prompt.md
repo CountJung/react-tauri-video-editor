@@ -9,7 +9,7 @@ agent: "agent"
 
 관련 스킬: [ui-conventions](../.github/skills/ui-conventions/SKILL.md), [ui-table-patterns](../.github/skills/ui-table-patterns/SKILL.md), [react-best-practices](../.github/skills/react-best-practices/SKILL.md)
 
-프로젝트 맵: [docs/project-map.md](../../docs/project-map.md)
+프로젝트 맵: [PROJECT_MAP.md](../../PROJECT_MAP.md)
 
 ---
 
@@ -116,7 +116,7 @@ function MyPage() {
 export const MY_TABLE_STORAGE_KEY = "my-table";
 ```
 
-### 3. docs/project-map.md §2 라우트 테이블 업데이트
+### 3. PROJECT_MAP.md 라우트 테이블 업데이트
 
 ```md
 | `/domain/name` | `domain/name.tsx` | ui-table-patterns |
@@ -133,5 +133,5 @@ export const MY_TABLE_STORAGE_KEY = "my-table";
 - [ ] `tauriInvoke` 만 사용 (직접 import 없음)
 - [ ] DataGrid 사용 시: `key={orderKey}` + `CustomColumnsPanel` + `DataGridPagination`
 - [ ] storageKey 상수가 `storageKeys.ts`에 추가됨
-- [ ] `docs/project-map.md` 라우트 테이블 업데이트
+- [ ] `PROJECT_MAP.md` 라우트 테이블 업데이트
 - [ ] TS/Biome 에러 0

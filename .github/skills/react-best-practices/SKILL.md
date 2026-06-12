@@ -89,5 +89,7 @@ useEffect(() => {
 
 - 컴포넌트 외부에서 변하지 않는 상수/배열/객체는 **컴포넌트 밖**에 정의
 - 무거운 컴포넌트(Monaco Editor 등)는 **동적 import** 고려
+- `pnpm build:vite`에서 500kB+ chunk 경고가 발생하면 `$project-structure-review-agent` 기준으로 구조를 검토하고, route body/dialog/editor panel/settings/media tool을 `React.lazy` 또는 동적 `import()`로 먼저 분리한다.
+- 경고 제거만을 위해 `build.chunkSizeWarningLimit`를 올리는 것은 마지막 수단이다. Tauri 데스크톱 번들에서 허용 가능한 크기라는 판단과 기록이 있을 때만 사용한다.
 - 긴 목록 → DataGrid 사용 (가상화 내장), 직접 `map` 렌더 삼가
 - 이벤트 핸들러에서 직접 `setState` 호출 (useEffect를 통한 연쇄 setState 지양)

@@ -344,7 +344,7 @@
 - [ ] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
 - [ ] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
 - [x] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결
-- [ ] **번들 코드 스플리팅** — Vite build의 500kB+ 청크 경고 해소를 위해 route/dialog/vendor chunk 분리
+- [x] **번들 코드 스플리팅** — Vite build의 500kB+ 청크 경고 해소를 위해 route/dialog/app shell lazy chunk 분리
 - [ ] **FFmpeg sidecar 배포 검증** — macOS arm64/x64, Windows, Linux별 sidecar 파일명/서명/번들 검증
 
 ---

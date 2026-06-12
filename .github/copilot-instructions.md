@@ -26,6 +26,8 @@
 11. **MD 다이어그램 — 한글+박스 그림 금지** — 아키텍처 다이어그램은 **Mermaid**(`mermaid` 코드 블록) 또는 ASCII 전용(`+`, `-`, `|`) 박스를 사용한다. 트리(`├─`, `└─`) 구조에서 한글 라벨은 허용.
 12. **단일 파일 1,000줄 초과 시 리팩토링 필수** — 역할·도메인 기준으로 분리. `src/components/{feature}/` 하위에 관련 파일 그룹화.
 13. **TODO.md 체크 표시 즉시 반영 필수** — 기능 구현이 완료되는 즉시 `TODO.md`의 해당 항목을 `[ ]` → `[x]`로 변경한다. 구현 세션이 끝날 때 미체크 항목이 남아있으면 안 된다. 부분 구현 항목은 하위 항목별로 개별 체크한다.
+14. **Vite 500kB+ chunk 경고 대응** — `pnpm build:vite`에서 chunk 경고가 발생하면 Project Structure Review Agent 관점으로 route body, dialog, editor panel, settings 화면의 lazy loading/code splitting을 먼저 검토·적용한다. `chunkSizeWarningLimit` 상향은 마지막 수단이다.
+15. **프로젝트 맵 우선 탐색** — 코드 검색 전 루트 `PROJECT_MAP.md`를 먼저 확인하고, 구조 변경이 있으면 같은 작업에서 최신화한다.
 
 ---
 
@@ -139,7 +141,7 @@ Copilot에서는 커스텀 에이전트로 호출하고, Codex에서는 같은 �
 ## 프로젝트 맵 & 프로젝트 구조 문서
 
 - **핵심 규칙 & 에이전트 지침** → `AGENTS.md` (루트) — 모든 에이전트가 작업 전 참조
-- **프로젝트 전체 구조 맵** → `docs/project-map.md` — 레이어 구조, 라우트 맵, 커맨드 맵, 환경변수, 체크리스트
+- **프로젝트 전체 구조 맵** → `PROJECT_MAP.md` (루트) — 레이어 구조, 라우트 맵, 커맨드 맵, 파일 역할, 체크리스트
 
 **모든 작업 전 두 파일을 기준으로 체크하고, 소스와 불일치하면 즉시 업데이트한다.**
 
@@ -191,16 +193,16 @@ Copilot에서는 커스텀 에이전트로 호출하고, Codex에서는 같은 �
 
 ## graphify
 
-Codex에서도 동일하게 적용한다: 저장소 구조·아키텍처 질문이나 관련 코드 수정 전 `graphify-out/GRAPH_REPORT.md`가 있으면 먼저 읽는다. 없거나 stale이면 관련 소스/문서를 직접 확인한다.
+Codex에서도 동일하게 적용한다: 저장소 구조·아키텍처 질문이나 관련 코드 수정 전 루트 `PROJECT_MAP.md`를 먼저 읽는다. 그 다음 `graphify-out/GRAPH_REPORT.md`가 있으면 보조 자료로 확인한다. 둘 중 하나가 stale이면 관련 소스/문서를 확인한 뒤 `PROJECT_MAP.md`를 갱신한다.
 
 For any question about this repo's architecture, structure, components, or how to add/modify/find
-code, your **first tool call must be** to read `graphify-out/GRAPH_REPORT.md` (if it exists).
+code, your **first tool call must be** to read `PROJECT_MAP.md`.
 
 Triggers: "how do I…", "where is…", "what does … do", "add/modify a <component>",
 "explain the architecture", or anything that depends on how files or classes relate.
 
-After reading the report (and `graphify-out/wiki/index.md` for deep questions), answer from the
-graph. Only read source files when (a) modifying/debugging specific code, (b) the graph lacks
-the needed detail, or (c) the graph is missing or stale.
+After reading the project map, use `graphify-out/GRAPH_REPORT.md` and `graphify-out/wiki/index.md`
+for deep graph questions if they exist. Only read source files when (a) modifying/debugging specific
+code, (b) the map lacks the needed detail, or (c) the map is missing or stale.
 
 Type `/graphify` in Copilot Chat to build or update the graph.
