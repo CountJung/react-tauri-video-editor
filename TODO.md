@@ -146,7 +146,7 @@
   - `undoStack.length === 0` 이면 Undo 버튼 비활성화
   - `redoStack.length === 0` 이면 Redo 버튼 비활성화
   - 툴팁에 마지막 액션 레이블 표시 (예: "실행 취소: 클립 이동")
-- [ ] **히스토리 패널 (선택)** — 우측 PropertiesPanel 내 탭 형태로 히스토리 목록 표시
+- [x] **히스토리 패널 (선택)** — 우측 PropertiesPanel 내 탭 형태로 히스토리 목록 표시
   - 액션 이름·아이콘 목록, 클릭으로 특정 지점으로 이동 (고급)
 
 ### 키보드 단축키 전역 등록
@@ -163,6 +163,7 @@
     | `Ctrl+O` | 프로젝트 열기 |
     | `Space` | 재생/일시정지 토글 |
     | `Delete` / `Backspace` | 선택된 클립 삭제 |
+    | `Shift+Delete` / `Shift+Backspace` | 선택 클립 삭제 후 같은 트랙의 뒤쪽 클립 당기기 |
     | `V` | Select 도구 |
     | `T` | Text 도구 |
     | `R` | Rectangle 도구 |
@@ -288,10 +289,10 @@
 
 ## Phase 9 — 고급 편집 기능
 
-- [ ] **클립 분할 (Razor)** — 플레이헤드 위치에서 클립을 두 개로 분리 (`splitClip`)
-- [ ] **갭 제거** — 클립 삭제 후 이후 클립들을 앞으로 당기기 (`deleteGap`)
-- [ ] **Timeline Magic Wand (자동 삽입)** — 기준 트랙 위에 다른 클립을 삽입할 때 기준 영상이 자동 조정되는 스마트 삽입 기능
-  - **삽입 모드 선택** — 타임라인 드롭 시 `overlay` vs `insert` 모드 선택 UI (드롭 미니 팝오버)
+- [x] **클립 분할 (Razor)** — 플레이헤드 위치에서 클립을 두 개로 분리 (`splitClip`)
+- [x] **갭 제거** — 클립 삭제 후 이후 클립들을 앞으로 당기기 (`deleteGap`)
+- [x] **Timeline Magic Wand (자동 삽입)** — 기준 트랙 위에 다른 클립을 삽입할 때 기준 영상이 자동 조정되는 스마트 삽입 기능
+  - **삽입 모드 선택** — ToolPanel Magic Wand 토글로 `overlay` vs `insert` 모드 선택
   - **insert 모드 동작**:
     1. 삽입 지점에서 기준 트랙 클립을 `splitClip()`으로 자동 분할
     2. 삽입 클립 duration만큼 분할된 후반부 클립을 뒤로 이동 (ripple push)
@@ -301,25 +302,25 @@
   - **Magic Wand 버튼** — ToolPanel 또는 타임라인 툴바에 Magic Wand 토글 버튼 추가
     - 활성화 시 드롭 기본 동작이 insert 모드로 변경
   - **되돌리기 지원** — undo/redo 스택과 연동 필요
-- [ ] **재생 속도 조절** — 클립 속성에 `playbackRate` 추가 (0.25×~4×)
-- [ ] **페이드 인/아웃** — 클립 시작/끝 불투명도 키프레임 (fade handle)
-- [ ] **비디오 크롭** — displayRect로 보여줄 영역 지정 (클립 내부 뷰포트)
-- [ ] **키프레임 애니메이션** — 위치·크기·불투명도에 키프레임 추가 (고급)
+- [x] **재생 속도 조절** — 클립 속성에 `playbackRate` 추가 (0.25×~4×)
+- [x] **페이드 인/아웃** — 클립 시작/끝 불투명도 키프레임 (fade handle)
+- [x] **비디오 크롭** — `cropRect`로 보여줄 영역 지정 (클립 내부 뷰포트)
+- [x] **키프레임 애니메이션** — 위치·크기·불투명도에 키프레임 추가 (고급)
 
 ---
 
 ## Phase 10 — FFmpeg Export 고도화
 
-- [ ] **Export Payload 재설계** — 단순 clips 배열 대신 `projectMeta + tracks + assets` 전체 타임라인 모델을 Rust로 전달
-- [ ] **타임라인 위치/갭 Export 반영** — clip `start`, 빈 구간, overlap 정책을 FFmpeg filter graph에 반영
-- [ ] **오버레이 합성 Export** — overlay 트랙 이미지/비디오를 FFmpeg overlay 필터로 합성
-- [ ] **텍스트 Export** — FFmpeg `drawtext` 필터로 텍스트 번인(burn-in)
-- [ ] **도형 Export** — FFmpeg `drawbox`/`geq` 필터 또는 GIF 오버레이
-- [ ] **트랙 가시성 Export** — visible=false 트랙 제외
-- [ ] **오디오 믹싱** — 다중 오디오 트랙 `amix` 필터
-- [ ] **무음/오디오 없는 소스 Export 대응** — 비디오/이미지 입력에 오디오 스트림이 없을 때 `anullsrc` fallback 또는 무음 export 경로 구현
-- [ ] **해상도·프레임레이트 설정** — Export 옵션 UI 추가
-- [ ] **프리뷰-Export 일치성 테스트** — 대표 프로젝트 fixture로 Canvas Preview 모델과 Export 결과가 같은지 회귀 검증
+- [x] **Export Payload 재설계** — 단순 clips 배열 대신 `projectMeta + tracks + assets` 전체 타임라인 모델을 Rust로 전달
+- [x] **타임라인 위치/갭 Export 반영** — clip `start`, 빈 구간, overlap 정책을 FFmpeg filter graph에 반영
+- [x] **오버레이 합성 Export** — overlay 트랙 이미지/비디오를 FFmpeg overlay 필터로 합성
+- [x] **텍스트 Export** — FFmpeg `drawtext` 필터로 텍스트 번인(burn-in)
+- [x] **도형 Export** — FFmpeg `drawbox`/`geq` 필터 또는 GIF 오버레이
+- [x] **트랙 가시성 Export** — visible=false 트랙 제외
+- [x] **오디오 믹싱** — 다중 오디오 트랙 `amix` 필터
+- [x] **무음/오디오 없는 소스 Export 대응** — 비디오/이미지 입력에 오디오 스트림이 없을 때 `anullsrc` fallback 또는 무음 export 경로 구현
+- [x] **해상도·프레임레이트 설정** — Export 옵션 UI 추가
+- [x] **프리뷰-Export 일치성 테스트** — 대표 프로젝트 fixture로 Canvas Preview 모델과 Export 결과가 같은지 회귀 검증
 
 ---
 
@@ -330,8 +331,8 @@
 - [x] **타임라인 duration 재계산 누락 수정** — trim/split 후 `duration` 재계산
 - [x] **FFmpeg/ffprobe 실패 상태 확인** — 썸네일 생성/metadata probe에서 non-zero exit 에러 처리
 - [x] **프로젝트 저장 안정화 1차** — JSON 검증 후 임시 파일 write + rename 방식 저장
-- [ ] **Dirty/Undo 적용 범위 완성** — Canvas 드래그, PropertiesPanel 입력, ToolPanel 액션 전체를 `withHistory()`로 통합
-- [ ] **Undo/Redo 후 dirty 정책 정리** — undo/redo 실행 후 저장 필요 상태와 저장 직후 history 정책 결정
+- [x] **Dirty/Undo 적용 범위 완성** — Canvas 드래그, PropertiesPanel 입력, ToolPanel 액션 전체를 `withHistory()`로 통합
+- [x] **Undo/Redo 후 dirty 정책 정리** — undo/redo 실행 후 저장 필요 상태와 저장 직후 history 정책 결정
 - [x] **브라우저 개발 모드 Tauri guard** — Vite 브라우저 실행 시 `window.__TAURI__` 부재를 명확히 처리하고 IPC 버튼을 mock/disable
 - [x] **브라우저 검증 fallback 지침화** — Codex 인앱 브라우저 실패 시 Playwright MCP로 `127.0.0.1:1420` 재시도
 - [x] **브라우저 AssetPanel 파일 추가 fallback** — Vite 웹 환경에서 native file drop/input으로 `blob:` URL 에셋을 생성하고 프리뷰 URL 변환을 우회
@@ -341,18 +342,22 @@
 - [x] **검증용 비디오 전체 캔버스 고정 렌더** — fitMode를 우회하고 비디오 프레임을 `0,0,canvasWidth,canvasHeight`에 직접 그려 표시 확인
 - [x] **비디오 맞춤 모드 비활성화** — 우측 PropertiesPanel의 미디어 맞춤 제어를 비활성화하고 전체 캔버스 고정 렌더 상태를 명시
 - [x] **Crop 제어 표시 조건화** — Crop 도구의 수치 제어는 `자르기 편집 시작` 버튼을 누른 동안에만 표시·동작
-- [ ] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
-- [ ] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
+- [x] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
+- [x] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
 - [x] **도구별 Canvas 편집 완성** — Text/Shape/Crop/Razor 도구를 실제 clip 생성·수정·분할 액션에 연결
 - [x] **번들 코드 스플리팅** — Vite build의 500kB+ 청크 경고 해소를 위해 route/dialog/app shell lazy chunk 분리
-- [ ] **FFmpeg sidecar 배포 검증** — macOS arm64/x64, Windows, Linux별 sidecar 파일명/서명/번들 검증
+- [x] **FFmpeg sidecar 배포 검증** — macOS arm64/x64, Windows, Linux별 sidecar 파일명/서명/번들 검증
+  - [x] `pnpm verify:ffmpeg-sidecars` / `pnpm verify:ffmpeg-sidecars:all` 검증 스크립트 추가
+  - [x] Windows `x86_64-pc-windows-msvc` sidecar 파일명·실행 검증 통과
+  - [x] Release workflow에 Windows/macOS/Linux 호스트별 `pnpm verify:ffmpeg-sidecars` 게이트 추가
+  - [x] macOS arm64/x64, Linux x64/arm64 sidecar 파일 배치 후 `pnpm verify:ffmpeg-sidecars:all` 검증
 
 ---
 
 ## 기술 부채 / 보완 사항
 
-- [ ] `asset.rs` — `uuid_v4()` naive 구현 → `uuid` crate로 교체
-- [ ] `.env` 로드 — Rust에서 `dotenv` 또는 빌드 타임 주입 방식 결정
+- [x] `asset.rs` — `uuid_v4()` naive 구현 → `uuid` crate로 교체
+- [x] `.env` 로드 — Rust에서 `dotenv` 또는 빌드 타임 주입 방식 결정
 - [x] `src-tauri/icons/` — 실제 앱 아이콘으로 교체 (클래퍼보드 디자인 생성 완료)
 - [x] **Canvas 성능** — Phase 5에서 Canvas Compositor 구현 시 처리
 - [x] **undo/redo** — Phase 4-c로 이관 (상세 항목 참조)
@@ -363,5 +368,5 @@
 - [x] **크로스플랫폼 디버깅 지침화** — macOS/Windows 공통 Vite helper, 127.0.0.1 devUrl 규칙, 플랫폼별 cleanup 절차를 스크립트와 문서에 명시
 - [x] **미저장 종료 경고 수정** — 창 닫기 시 `저장하지 않고 종료`가 재차 close guard에 막히지 않도록 우회 플래그와 상황별 버튼 라벨 적용
 - [x] **창 크기·위치 복원** — `tauri-plugin-window-state`로 앱 종료/재시작 간 메인 창 bounds 저장
-- [ ] **외장 볼륨 Cargo target 보완** — Tauri permission 생성 중 `._default.toml`이 생기는 환경에서는 `CARGO_TARGET_DIR`를 로컬 디스크로 지정하는 검증 스크립트/문서화 필요
-- [ ] `.github/prompts/` — `new-route.prompt.md`, `new-command.prompt.md` 내용 검토
+- [x] **외장 볼륨 Cargo target 보완** — Tauri permission 생성 중 `._default.toml`이 생기는 환경에서는 `CARGO_TARGET_DIR`를 로컬 디스크로 지정하는 검증 스크립트/문서화 필요
+- [x] `.github/prompts/` — `new-route.prompt.md`, `new-command.prompt.md` 내용 검토

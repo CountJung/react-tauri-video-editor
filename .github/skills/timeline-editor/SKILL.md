@@ -35,12 +35,27 @@ export type Clip = {
   duration: number      // 표시 길이 (초)
   trimStart: number     // 원본 자르기 시작 (초)
   trimEnd: number       // 원본 자르기 끝 (초)
+  playbackRate: number  // 미디어 재생 속도 (0.25x~4x)
+  fadeInDuration: number
+  fadeOutDuration: number
+  keyframes: Array<{
+    time: number        // 클립 시작 기준 초
+    x: number
+    y: number
+    width: number
+    height: number
+    opacity: number
+  }>
 }
 
 export type Track = {
   id: string
-  type: 'video' | 'audio'
+  type: 'video' | 'audio' | 'overlay' | 'text' | 'shape'
   clips: Clip[]
+  visible: boolean
+  locked: boolean
+  opacity: number
+  zIndex: number
 }
 
 export type TimelineState = {
@@ -58,6 +73,9 @@ export type TimelineState = {
 - 미디어 클립을 처음 추가할 때 `x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`로 캔버스 전체를 차지하게 한다.
 - `video` 트랙의 미디어 클립은 베이스 영상으로 취급한다. 프로젝트 로드, 캔버스 크기 변경, 레거시 상태 보정 시 `x=0`, `y=0`, `width=canvasWidth`, `height=canvasHeight`로 강제 복구한다.
 - 원본 비디오/이미지의 비율 맞춤은 `Clip.fitMode`가 담당한다. 기본값 `fit`은 클립 사각형 내부에 전체 소스를 보이게 letterbox/pillarbox로 그린다.
+- `Clip.playbackRate`는 프리뷰 원본 시간 매핑과 timeline 표시 duration 계산에 함께 반영한다. 레거시 프로젝트 로드 시 기본값은 `1`로 보정한다.
+- `Clip.fadeInDuration` / `fadeOutDuration`은 Canvas 합성 시 clip opacity에 곱해 프리뷰에 반영한다. 레거시 프로젝트 로드 시 기본값은 `0`으로 보정한다.
+- `Clip.keyframes`는 클립 시작 기준 `time`에 위치, 크기, 불투명도를 저장한다. Canvas preview는 현재 타임라인 시간에 맞춰 선형 보간된 clip 사본을 렌더링한다.
 - 프리뷰의 fit/fill 계산은 `ffprobe`/임포트 단계에서 얻은 에셋 `width`/`height`를 우선 사용하고, 없을 때만 브라우저 미디어 엘리먼트의 `videoWidth`/`naturalWidth`를 fallback으로 사용한다.
 - 현재 검증용 동작에서는 비디오 미디어 레이어를 `0,0,canvasWidth,canvasHeight`에 직접 그려 `fitMode`를 우회하고 전체 프레임을 항상 보이게 한다.
 - 이 검증용 동작이 활성화된 동안 우측 PropertiesPanel의 미디어 맞춤 모드는 비활성화한다.
@@ -98,7 +116,9 @@ interface TimelineActions {
   trimClipStart: (clipId: string, newTrimStart: number) => void
   trimClipEnd: (clipId: string, newTrimEnd: number) => void
   removeClip: (clipId: string) => void
+  deleteGap: (clipId: string) => void
   splitClip: (clipId: string, atSec: number) => void
+  ripplePushClips: (trackId: string, fromTime: number, delta: number) => void
   setCurrentTime: (time: number) => void
   setZoom: (zoom: number) => void
   setPlaying: (playing: boolean) => void
@@ -276,6 +296,11 @@ export function ClipItem({ clip }: { clip: Clip }) {
 
 Trim은 dnd-kit 대신 **pointerdown/pointermove/pointerup** 이벤트로 구현한다.  
 (dnd-kit은 전체 요소 이동 위주이므로 좌우 핸들 Trim에 부적합)
+
+- Trim, Canvas transform drag, Track opacity slider처럼 드래그 중 여러 번 상태가 바뀌는 편집은 시작 시점에 `withHistory(label, () => undefined)`로 변경 전 스냅샷과 dirty 상태를 먼저 기록한 뒤, move 이벤트에서 `useTimelineStore` 액션을 반복 호출한다.
+- PropertiesPanel의 클립 위치/크기/회전/불투명도/fitMode 입력은 직접 `updateClipCanvas`를 호출하지 말고 `withHistory()` 또는 같은 정책의 helper를 통해 기록한다.
+- Undo/redo/history jump는 `src/lib/historyActions.ts`의 `undoWithDirty`, `redoWithDirty`, `jumpToUndoIndexWithDirty`를 통해 호출한다. 스냅샷 복원에 성공한 경우에만 `projectStore.isDirty`를 켠다.
+- 프로젝트 저장은 dirty만 해제하고 history stack은 유지한다. 저장 직후 undo/redo를 실행하면 다시 저장 필요 상태가 된다.
 
 ```tsx
 // src/components/timeline/TrimHandle.tsx

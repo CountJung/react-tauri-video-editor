@@ -3,6 +3,7 @@ import { useStickyState } from '@/lib/useStickyState'
 import { withHistory } from '@/lib/withHistory'
 import { useAssetStore } from '@/store/assetStore'
 import { useTimelineStore } from '@/store/timelineStore'
+import { useToolStore } from '@/store/toolStore'
 import {
   DndContext,
   type DragEndEvent,
@@ -42,6 +43,7 @@ export function EditorLayout() {
   const addClip = useTimelineStore((s) => s.addClip)
   const moveClip = useTimelineStore((s) => s.moveClip)
   const reorderTracks = useTimelineStore((s) => s.reorderTracks)
+  const magicInsertEnabled = useToolStore((s) => s.magicInsertEnabled)
   const [overlayInfo, setOverlayInfo] = useState<OverlayInfo | null>(null)
 
   const [assetWidth, setAssetWidth] = useStickyState(240, STORAGE_KEYS.PANEL_ASSET_WIDTH)
@@ -79,7 +81,26 @@ export function EditorLayout() {
       // getBoundingClientRect 기반이므로 scrollLeft는 별도 보정 불필요
       const translated = active.rect.current.translated
       const dropX = translated != null ? translated.left - over.rect.left : 0
-      withHistory('클립 추가', () => addClip(overData.trackId, asset, Math.max(0, dropX / zoom)))
+      const startSec = Math.max(0, dropX / zoom)
+      if (!magicInsertEnabled) {
+        withHistory('클립 추가', () => addClip(overData.trackId, asset, startSec))
+        return
+      }
+
+      withHistory('Magic Wand 삽입', () => {
+        const timeline = useTimelineStore.getState()
+        const targetTrack = timeline.tracks.find((track) => track.id === overData.trackId)
+        const clipAtDrop = targetTrack?.clips.find(
+          (clip) => startSec > clip.start && startSec < clip.start + clip.duration
+        )
+        if (clipAtDrop) {
+          timeline.splitClip(clipAtDrop.id, startSec)
+        }
+
+        const duration = asset.duration || 5
+        useTimelineStore.getState().ripplePushClips(overData.trackId, startSec, duration)
+        useTimelineStore.getState().addClip(overData.trackId, asset, startSec)
+      })
     }
 
     // 클립 이동 (delta.x / zoom = 이동한 초)

@@ -1,132 +1,87 @@
 ---
-description: "Rust Tauri command 추가 스캐폴딩 — AppError, lib.rs 등록, HTTP bridge dispatch, DB 쿼리, 환경변수 패턴 포함"
+description: "Rust Tauri command 추가 스캐폴딩 — AppError, command module, invoke_handler, capability/security 검토"
 name: "New Command"
-argument-hint: "커맨드 이름과 기능 (예: my_item_list — 아이템 목록 조회)"
+argument-hint: "커맨드 이름과 기능 (예: asset_validate — 미디어 파일 유효성 검사)"
 agent: "agent"
 ---
 
 # 새 Rust Tauri Command 스캐폴딩
 
-관련 스킬: [tauri-backend](../.github/skills/tauri-backend/SKILL.md), [rust-skills](../.github/skills/rust-skills/SKILL.md)
+관련 스킬: [tauri-backend](../skills/tauri-backend/SKILL.md), [rust-skills](../skills/rust-skills/SKILL.md)
 
 프로젝트 맵: [PROJECT_MAP.md](../../PROJECT_MAP.md)
 
 ---
 
-## 규칙 (항상 준수)
+## 규칙
 
-1. **반환 타입**: 모든 command는 `Result<T, AppError>` 반환 (`common.rs`).
-2. **모듈 위치**: `src-tauri/src/commands/<domain>.rs` — 기존 도메인 파일에 추가하거나 새 파일 생성.
-3. **등록**: `commands/mod.rs` 모듈 선언 + `lib.rs` `invoke_handler!` 목록 추가.
-4. **HTTP bridge**: `http_server.rs`의 `dispatch()` 또는 `dispatch_db()` match 암에 추가.
-5. **camelCase 폴백**: HTTP bridge args는 `str_arg2(args, "camelKey", "snake_key")` 사용.
-6. **환경변수 하드코딩 금지**: 주기·포트·URL은 `.env` → `std::env::var` 사용.
-7. **DB 쿼리 로깅**: 실행 직전 `log::info!("[cmd_name] SQL: {} | params: {:?}", sql, params)`.
-8. **완료 후 확인**: `cargo check` / `cargo clippy` 경고 0.
+1. 작업 전 `PROJECT_MAP.md`, `.github/copilot-instructions.md`, `.github/instructions/backend.instructions.md`, `.github/skills/tauri-backend/SKILL.md`를 확인한다.
+2. 모든 command는 `Result<T, AppError>`를 반환한다.
+3. command는 `src-tauri/src/commands/<domain>.rs`에 추가한다.
+4. 새 domain 파일을 만들면 `src-tauri/src/commands/mod.rs`에 `pub mod <domain>;`를 추가한다.
+5. `src-tauri/src/lib.rs`의 `tauri::generate_handler!` 목록에 등록한다.
+6. 프론트엔드는 `tauriInvoke` / `tauriListen` wrapper만 사용한다.
+7. 경로 입력은 정규화·존재 여부·확장자·권한 범위를 검증한다.
+8. FFmpeg/ffprobe는 sidecar API와 구조화된 args만 사용한다. shell 문자열 조합 금지.
+9. 새 플러그인 권한이나 파일 접근이 필요하면 `src-tauri/capabilities/default.json`을 최소 권한으로 갱신한다.
+10. 설정값은 하드코딩하지 말고 OS env 또는 `src-tauri/build.rs` allowlist 기반 공개 빌드 설정을 사용한다.
 
 ---
 
-## 스캐폴딩 절차
-
-### 1. command 함수 작성 (`src-tauri/src/commands/<domain>.rs`)
+## command 예시
 
 ```rust
-use super::common::AppError;
-use crate::database::DbPool;
-use serde::{Deserialize, Serialize};
-use tauri::State;
+// src-tauri/src/commands/example.rs
+use crate::commands::common::AppError;
 
-/// 반환 DTO
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MyItemDto {
-    pub id: i64,
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExampleDto {
     pub name: String,
 }
 
-/// command 구현
 #[tauri::command]
-pub async fn my_item_list(
-    db: State<'_, DbPool>,
-    // 필요 시: mmc: State<'_, Arc<MmcClient>>,
-) -> Result<Vec<MyItemDto>, AppError> {
-    let pool = db.sub_schema(); // 또는 db.main_schema() (차트/대시보드)
-    let sql = "SELECT id, name FROM MY_TABLE ORDER BY id";
-    log::info!("[my_item_list] SQL: {}", sql);
-
-    let rows = sqlx::query_as::<_, MyItemDto>(sql)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    Ok(rows)
+pub async fn example_list() -> Result<Vec<ExampleDto>, AppError> {
+    Ok(vec![ExampleDto {
+        name: "example".to_string(),
+    }])
 }
 ```
 
-### 2. 모듈 등록 (`src-tauri/src/commands/mod.rs`)
-
-기존 도메인 파일에 추가하거나 새 파일이면:
-```rust
-pub mod my_domain;  // 새 파일인 경우만
-pub use my_domain::my_item_list;  // 재내보내기
-```
-
-### 3. `lib.rs` invoke_handler 등록
+## 모듈 등록
 
 ```rust
-tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![
-        // ... 기존 커맨드들
-        commands::my_item_list,  // 추가
-    ])
+// src-tauri/src/commands/mod.rs
+pub mod example;
 ```
 
-### 4. HTTP bridge 등록 (`src-tauri/src/http_server.rs`)
+## invoke handler 등록
 
-**DB 커맨드** → `dispatch_db()` match 암:
 ```rust
-"my_item_list" => {
-    let rows = commands::my_item_list(db.into()).await?;
-    serde_json::to_value(rows).map_err(|e| AppError::internal(e.to_string()))
-}
+// src-tauri/src/lib.rs
+.invoke_handler(tauri::generate_handler![
+    commands::example::example_list,
+])
 ```
 
-**camelCase 인자가 있는 경우**:
-```rust
-"my_item_get" => {
-    let id = str_arg2(&args, "itemId", "item_id")
-        .ok_or_else(|| AppError::invalid_argument("itemId required"))?
-        .parse::<i64>()
-        .map_err(|_| AppError::invalid_argument("itemId must be integer"))?;
-    let row = commands::my_item_get(db.into(), id).await?;
-    serde_json::to_value(row).map_err(|e| AppError::internal(e.to_string()))
-}
-```
-
-### 5. 프론트엔드 호출
+## 프론트엔드 호출
 
 ```ts
-// src/routes/<domain>/<page>.tsx
-import { tauriInvoke } from "../../lib/invoke";
+import { tauriInvoke } from '@/lib/invoke'
 
-const items = await tauriInvoke<MyItemDto[]>("my_item_list");
-```
-
-### 6. PROJECT_MAP.md 커맨드 맵 업데이트
-
-```md
-| `my_domain.rs` | `my_item_list`, `my_item_get` | 내 도메인 |
+const rows = await tauriInvoke<ExampleDto[]>('example_list')
 ```
 
 ---
 
-## 체크리스트
+## 완료 체크리스트
 
 - [ ] `Result<T, AppError>` 반환
-- [ ] `commands/mod.rs` 모듈 선언
-- [ ] `lib.rs` `invoke_handler!` 등록
-- [ ] `http_server.rs` dispatch 암 추가
-- [ ] camelCase 인자 → `str_arg2` 사용
-- [ ] DB 쿼리 `log::info!` 로깅
-- [ ] 환경변수 하드코딩 없음
-- [ ] `cargo check` / `cargo clippy` 경고 0
-- [ ] `PROJECT_MAP.md` 커맨드 맵 업데이트
+- [ ] `commands/mod.rs`와 `lib.rs` 등록 완료
+- [ ] frontend는 `tauriInvoke` wrapper만 사용
+- [ ] 경로/권한/security 검토 완료
+- [ ] capability 변경 시 최소 권한 유지
+- [ ] `PROJECT_MAP.md` 및 관련 skill/docs 갱신
+- [ ] `cargo fmt --check`
+- [ ] `cargo check`
+- [ ] `cargo clippy -- -D warnings`

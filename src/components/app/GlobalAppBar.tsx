@@ -1,3 +1,4 @@
+import { redoWithDirty, undoWithDirty } from '@/lib/historyActions'
 import { buildProjectJson } from '@/lib/projectSerialization'
 import { useGlobalShortcuts } from '@/lib/useGlobalShortcuts'
 import { useAssetStore } from '@/store/assetStore'
@@ -228,7 +229,7 @@ export function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
                 <IconButton
                   size="small"
                   disabled={!canUndo}
-                  onClick={() => useHistoryStore.getState().undo()}
+                  onClick={undoWithDirty}
                   aria-label="실행 취소"
                 >
                   <UndoIcon fontSize="small" />
@@ -240,7 +241,7 @@ export function GlobalAppBar({ onExport, onNewProject }: GlobalAppBarProps) {
                 <IconButton
                   size="small"
                   disabled={!canRedo}
-                  onClick={() => useHistoryStore.getState().redo()}
+                  onClick={redoWithDirty}
                   aria-label="다시 실행"
                 >
                   <RedoIcon fontSize="small" />

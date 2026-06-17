@@ -186,12 +186,27 @@ pub const EVENT_THUMBNAIL_READY: &str = "thumbnail-ready";
 
 ## 환경변수
 
-경로·설정 값 하드코딩 금지. `.env` → `std::env::var` 사용.
+경로·설정 값 하드코딩 금지. `.env` 또는 CI 환경변수로 관리한다.
+
+- Rust용 공개 빌드 설정은 `src-tauri/build.rs`의 allowlist를 통해 `cargo:rustc-env`로 주입한다.
+- 현재 allowlist는 `APP_TEMP_DIR`뿐이다. Secret, signing key, token, 사용자 개인 경로를 allowlist에 추가하지 않는다.
+- 런타임에서 새 Rust 설정을 읽어야 하면 실제 OS 환경변수(`std::env::var`)를 우선하고, 빌드 타임 fallback이 필요한 공개 값만 allowlist에 추가한다.
+- `.env.example`은 실제 `.env` 문법을 유지한다.
 
 ```
 # .env
 APP_TEMP_DIR=.video-editor-temp
 ```
+
+---
+
+## Tauri 보안 경계
+
+- `src-tauri/tauri.conf.json`의 `app.security.csp`는 `null`로 되돌리지 않는다. 프리뷰 미디어에 필요한 `asset:`/`http://asset.localhost`와 dev server 연결만 명시적으로 허용한다.
+- `assetProtocol.scope`는 `["**"]` 같은 전역 파일 접근을 금지한다. 현재 허용 범위는 일반 미디어 위치(`$VIDEO`, `$AUDIO`, `$PICTURE`, `$DOCUMENT`, `$DOWNLOAD`, `$DESKTOP`)와 `$TEMP`, `$APPCACHE`이며, 숨김 파일/키 파일은 deny 규칙으로 막는다.
+- capability에서 frontend `fs` plugin 권한은 부여하지 않는다. 프로젝트 저장/로드와 asset probe는 Rust command가 `AppError`를 반환하며 처리한다.
+- dialog 권한은 `dialog:allow-open`, `dialog:allow-save`만 사용한다. `dialog:default`로 ask/confirm/message까지 열지 않는다.
+- shell 권한은 `ffmpeg`/`ffprobe` sidecar의 execute/spawn만 허용한다. 일반 `shell:allow-open` 또는 scope 없는 `shell:allow-execute`를 추가하지 않는다.
 
 ---
 
@@ -227,6 +242,7 @@ APP_TEMP_DIR=.video-editor-temp
 ### 권장 체크 포인트
 
 - Debug 실행 전 `cargo check`가 내부 드라이브 캐시를 사용하고 있는지 확인한다.
+- `pnpm verify:cargo-target`로 `src-tauri/target`의 `._*` 메타파일과 외장 볼륨에서의 `CARGO_TARGET_DIR` 누락을 확인한다.
 - `src-tauri/target/`이 외장하드에 다시 생기면 즉시 설정을 점검한다.
 - Tauri 창 닫기/저장 다이얼로그 오류와 별개로, 빌드 단계에서의 패닉인지 런타임 오류인지 먼저 구분한다.
 - rust-analyzer가 만든 캐시가 보이면, 먼저 설정 문자열에 리터럴 `${env:...}`가 섞여 있지 않은지 확인한다.

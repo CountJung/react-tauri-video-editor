@@ -5,11 +5,14 @@ import { describe, expect, it } from 'vitest'
 import {
   collectActiveLayers,
   getAssetUrl,
+  getClipFadeOpacity,
+  getClipLocalTime,
   getContainedCanvasDisplaySize,
   getFitDrawRect,
   getMediaSourceSize,
   hitTestClip,
   hitTestLayers,
+  resolveClipKeyframes,
 } from './canvasCompositor'
 
 function clip(overrides: Partial<Clip> = {}): Clip {
@@ -27,6 +30,10 @@ function clip(overrides: Partial<Clip> = {}): Clip {
     height: 200,
     rotation: 0,
     opacity: 1,
+    playbackRate: 1,
+    fadeInDuration: 0,
+    fadeOutDuration: 0,
+    keyframes: [],
     fitMode: 'fit',
     ...overrides,
   }
@@ -215,6 +222,30 @@ describe('canvas compositor helpers', () => {
       width: 1920,
       height: 1080,
     })
+  })
+
+  it('maps timeline time through clip playback rate', () => {
+    expect(getClipLocalTime(clip({ start: 10, trimStart: 2, playbackRate: 2 }), 13)).toBe(8)
+  })
+
+  it('calculates clip fade opacity from timeline time', () => {
+    expect(getClipFadeOpacity(clip({ start: 10, fadeInDuration: 2 }), 11)).toBe(0.5)
+    expect(getClipFadeOpacity(clip({ start: 10, fadeOutDuration: 2 }), 14)).toBe(0.5)
+  })
+
+  it('interpolates clip transform keyframes at the current timeline time', () => {
+    expect(
+      resolveClipKeyframes(
+        clip({
+          start: 10,
+          x: 0,
+          width: 100,
+          opacity: 1,
+          keyframes: [{ time: 2, x: 200, y: 50, width: 300, height: 200, opacity: 0.5 }],
+        }),
+        11
+      )
+    ).toMatchObject({ x: 100, width: 200, opacity: 0.75 })
   })
 
   it('caps fixed preview zoom so the full canvas remains visible', () => {

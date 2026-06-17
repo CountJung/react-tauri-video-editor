@@ -12,6 +12,13 @@ pnpm dev
 
 `pnpm dev` runs `tauri dev`. Tauri uses `src-tauri/tauri.conf.json` and starts Vite through `beforeDevCommand`.
 
+### Environment Files
+
+Copy `.env.example` to `.env` for local overrides. Frontend keys use the `VITE_` prefix and are
+read by Vite. Rust build-time public settings are loaded by `src-tauri/build.rs` from either the OS
+environment or root `.env`, but only keys on the explicit allowlist are injected into the binary.
+Do not add secrets, signing keys, or personal paths to that allowlist.
+
 ### Window State
 
 The desktop window remembers its last size and position through `tauri-plugin-window-state`.
@@ -139,3 +146,16 @@ pnpm dev:vite:debug
 ```
 
 Do not commit local host overrides unless the default debug topology changes for everyone.
+
+### External Volume Cargo Target Check
+
+On macOS external volumes, AppleDouble files such as `._default.toml` can appear inside
+`src-tauri/target` and break Tauri permission generation. Keep Cargo output on an internal/local
+disk when working from external media:
+
+```bash
+export CARGO_TARGET_DIR="$HOME/.cache/react-tauri-video-editor-target"
+pnpm verify:cargo-target
+```
+
+The verifier also fails if `._*` metadata files already exist under `src-tauri/target`.

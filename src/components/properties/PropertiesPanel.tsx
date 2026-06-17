@@ -19,12 +19,17 @@ import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Slider from '@mui/material/Slider'
+import Tab from '@mui/material/Tab'
+import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import type React from 'react'
+import { useState } from 'react'
+import { HistoryPanel } from './HistoryPanel'
+import { KeyframePanel } from './KeyframePanel'
 
 const SYSTEM_FONTS = [
   'Arial',
@@ -234,6 +239,13 @@ function SelectPanel() {
     )
   }
 
+  const updateSelectedClipCanvas = (
+    label: string,
+    update: Parameters<typeof updateClipCanvas>[1]
+  ) => {
+    withHistory(label, () => updateClipCanvas(clip.id, update))
+  }
+
   return (
     <>
       <SectionTitle>캔버스</SectionTitle>
@@ -260,13 +272,13 @@ function SelectPanel() {
       <Row label="X">
         <NumInput
           value={Math.round(clip.x)}
-          onChange={(v) => updateClipCanvas(clip.id, { x: v })}
+          onChange={(v) => updateSelectedClipCanvas('클립 X 변경', { x: v })}
         />
       </Row>
       <Row label="Y">
         <NumInput
           value={Math.round(clip.y)}
-          onChange={(v) => updateClipCanvas(clip.id, { y: v })}
+          onChange={(v) => updateSelectedClipCanvas('클립 Y 변경', { y: v })}
         />
       </Row>
 
@@ -275,7 +287,7 @@ function SelectPanel() {
         <NumInput
           value={Math.round(clip.width)}
           min={1}
-          onChange={(v) => updateClipCanvas(clip.id, { width: v })}
+          onChange={(v) => updateSelectedClipCanvas('클립 너비 변경', { width: v })}
           unit="px"
         />
       </Row>
@@ -283,18 +295,41 @@ function SelectPanel() {
         <NumInput
           value={Math.round(clip.height)}
           min={1}
-          onChange={(v) => updateClipCanvas(clip.id, { height: v })}
+          onChange={(v) => updateSelectedClipCanvas('클립 높이 변경', { height: v })}
           unit="px"
         />
       </Row>
 
       <SectionTitle>변환</SectionTitle>
+      {clip.clipType === 'media' && (
+        <Row label="속도">
+          <TextField
+            size="small"
+            select
+            value={clip.playbackRate ?? 1}
+            onChange={(event) =>
+              withHistory('재생 속도 변경', () =>
+                updateClipCanvas(clip.id, { playbackRate: Number(event.target.value) })
+              )
+            }
+            inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
+            fullWidth
+          >
+            <MenuItem value={0.25}>0.25x</MenuItem>
+            <MenuItem value={0.5}>0.5x</MenuItem>
+            <MenuItem value={1}>1x</MenuItem>
+            <MenuItem value={1.5}>1.5x</MenuItem>
+            <MenuItem value={2}>2x</MenuItem>
+            <MenuItem value={4}>4x</MenuItem>
+          </TextField>
+        </Row>
+      )}
       <Row label="회전">
         <NumInput
           value={Math.round(clip.rotation)}
           min={-180}
           max={180}
-          onChange={(v) => updateClipCanvas(clip.id, { rotation: v })}
+          onChange={(v) => updateSelectedClipCanvas('클립 회전 변경', { rotation: v })}
           unit="°"
         />
       </Row>
@@ -305,7 +340,9 @@ function SelectPanel() {
             value={Math.round(clip.opacity * 100)}
             min={0}
             max={100}
-            onChange={(_, v) => updateClipCanvas(clip.id, { opacity: (v as number) / 100 })}
+            onChange={(_, v) =>
+              updateSelectedClipCanvas('클립 불투명도 변경', { opacity: (v as number) / 100 })
+            }
             sx={{ flex: 1 }}
           />
           <Typography variant="caption" sx={{ width: 30, textAlign: 'right' }}>
@@ -313,6 +350,34 @@ function SelectPanel() {
           </Typography>
         </Box>
       </Row>
+      <SectionTitle>페이드</SectionTitle>
+      <Row label="In">
+        <NumInput
+          value={clip.fadeInDuration ?? 0}
+          min={0}
+          max={clip.duration}
+          onChange={(value) =>
+            withHistory('페이드 인 변경', () =>
+              updateClipCanvas(clip.id, { fadeInDuration: Math.max(0, value) })
+            )
+          }
+          unit="s"
+        />
+      </Row>
+      <Row label="Out">
+        <NumInput
+          value={clip.fadeOutDuration ?? 0}
+          min={0}
+          max={clip.duration}
+          onChange={(value) =>
+            withHistory('페이드 아웃 변경', () =>
+              updateClipCanvas(clip.id, { fadeOutDuration: Math.max(0, value) })
+            )
+          }
+          unit="s"
+        />
+      </Row>
+      <KeyframePanel clip={clip} />
 
       {clip.clipType === 'media' && (
         <>
@@ -337,7 +402,9 @@ function SelectPanel() {
               disabled
               value={clip.fitMode}
               onChange={(e) =>
-                updateClipCanvas(clip.id, { fitMode: e.target.value as typeof clip.fitMode })
+                updateSelectedClipCanvas('클립 맞춤 모드 변경', {
+                  fitMode: e.target.value as typeof clip.fitMode,
+                })
               }
               inputProps={{ style: { padding: '2px 6px', fontSize: 12 } }}
               fullWidth
@@ -764,8 +831,11 @@ const TOOL_META: Record<ToolType, { label: string; Icon: SvgIconComponent }> = {
 export function PropertiesPanel({ onClose }: { onClose?: () => void }) {
   const activeTool = useToolStore((s) => s.activeTool)
   const { label, Icon } = TOOL_META[activeTool]
+  const [activeTab, setActiveTab] = useState<'properties' | 'history'>('properties')
 
   const renderContent = () => {
+    if (activeTab === 'history') return <HistoryPanel />
+
     switch (activeTool) {
       case 'select':
         return <SelectPanel />
@@ -813,7 +883,7 @@ export function PropertiesPanel({ onClose }: { onClose?: () => void }) {
           <Icon sx={{ fontSize: 16, color: 'primary.main' }} />
         </Tooltip>
         <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 12 }}>
-          {label}
+          {activeTab === 'history' ? '히스토리' : label}
         </Typography>
         <Tooltip title="속성 패널 닫기">
           <IconButton
@@ -826,6 +896,21 @@ export function PropertiesPanel({ onClose }: { onClose?: () => void }) {
           </IconButton>
         </Tooltip>
       </Box>
+
+      <Tabs
+        value={activeTab}
+        onChange={(_, value) => setActiveTab(value)}
+        variant="fullWidth"
+        sx={{
+          minHeight: 34,
+          borderBottom: 1,
+          borderColor: 'divider',
+          '& .MuiTab-root': { minHeight: 34, py: 0.5, fontSize: 12 },
+        }}
+      >
+        <Tab value="properties" label="속성" />
+        <Tab value="history" label="히스토리" />
+      </Tabs>
 
       {/* 내용 */}
       <Box sx={{ flex: 1, overflowY: 'auto', pb: 2 }}>{renderContent()}</Box>

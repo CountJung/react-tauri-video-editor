@@ -23,6 +23,7 @@ import {
   drawShapeClip,
   drawTextClip,
   getAssetUrl,
+  getClipFadeOpacity,
   getClipLocalTime,
   getContainedCanvasDisplaySize,
   getMediaSourceSize,
@@ -103,7 +104,9 @@ function clampClipMediaTime(clip: Clip, timelineTime: number): number {
 }
 
 function makeVideoSyncKey(clip: Clip): string {
-  return [clip.id, clip.start, clip.duration, clip.trimStart, clip.trimEnd].join(':')
+  return [clip.id, clip.start, clip.duration, clip.trimStart, clip.trimEnd, clip.playbackRate].join(
+    ':'
+  )
 }
 
 function getResizeHandle(clip: Clip, x: number, y: number): ResizeHandle | null {
@@ -155,6 +158,21 @@ function resizeClipRect(clip: Clip, handle: ResizeHandle, dx: number, dy: number
   }
 }
 
+function releaseVideoElement(video: HTMLVideoElement): void {
+  video.pause()
+  video.onloadeddata = null
+  video.onseeked = null
+  video.onerror = null
+  video.removeAttribute('src')
+  video.load()
+}
+
+function releaseImageElement(image: HTMLImageElement): void {
+  image.onload = null
+  image.onerror = null
+  image.removeAttribute('src')
+}
+
 /** Phase 5 — Canvas 기반 합성 프리뷰 플레이어 */
 export function PreviewPlayer() {
   const assets = useAssetStore((s) => s.assets)
@@ -185,6 +203,7 @@ export function PreviewPlayer() {
   const playLastTsRef = useRef<number | null>(null)
   const currentTimeRef = useRef(storeCurrentTime)
   const durationRef = useRef(duration)
+  const isPlayingRef = useRef(isPlaying)
   const activeToolRef = useRef(activeTool)
   const cropEditingRef = useRef(cropEditing)
   const videoCacheRef = useRef<Map<string, HTMLVideoElement>>(new Map())
@@ -231,6 +250,10 @@ export function PreviewPlayer() {
   useEffect(() => {
     durationRef.current = duration
   }, [duration])
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
 
   useEffect(() => {
     activeToolRef.current = activeTool
@@ -287,6 +310,73 @@ export function PreviewPlayer() {
     selectedClipRef.current = selectedClip
   }, [selectedClip])
 
+  const drawFrame = useCallback(() => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    for (const layer of activeLayersRef.current) {
+      const { clip, track, asset } = layer
+      if (clip.clipType === 'media' && asset?.type === 'video') {
+        const video = videoCacheRef.current.get(asset.id)
+        if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          ctx.save()
+          ctx.globalAlpha = Math.max(
+            0,
+            Math.min(
+              1,
+              clip.opacity * track.opacity * getClipFadeOpacity(clip, currentTimeRef.current)
+            )
+          )
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          ctx.restore()
+        }
+        continue
+      }
+
+      withClipTransform(
+        ctx,
+        clip,
+        track.opacity * getClipFadeOpacity(clip, currentTimeRef.current),
+        () => {
+          if (clip.clipType === 'text') drawTextClip(ctx, clip)
+          else if (clip.clipType === 'shape') drawShapeClip(ctx, clip)
+          else if (asset?.type === 'image') {
+            const img = imageCacheRef.current.get(asset.id)
+            if (img?.complete) {
+              const source = getMediaSourceSize(
+                asset,
+                { width: img.naturalWidth, height: img.naturalHeight },
+                clip
+              )
+              drawImageLike(ctx, img, source.width, source.height, clip)
+            }
+          }
+        }
+      )
+    }
+
+    const shouldDrawSelection = activeToolRef.current === 'crop' && cropEditingRef.current
+    if (selectedClipRef.current && shouldDrawSelection) drawSelection(ctx, selectedClipRef.current)
+  }, [])
+
+  const scheduleDrawFrame = useCallback(
+    (invalidation?: unknown) => {
+      void invalidation
+      if (isPlayingRef.current) return
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null
+        drawFrame()
+      })
+    },
+    [drawFrame]
+  )
+
   const syncMediaElements = useCallback(
     (
       layers: ActiveLayer[],
@@ -301,8 +391,13 @@ export function PreviewPlayer() {
         const url = getAssetUrl(asset)
 
         if (asset.type === 'image') {
-          if (!imageCacheRef.current.has(asset.id)) {
+          const cachedImage = imageCacheRef.current.get(asset.id)
+          if (cachedImage?.dataset.sourceUrl !== url) {
+            if (cachedImage) releaseImageElement(cachedImage)
             const img = new Image()
+            img.onload = scheduleDrawFrame
+            img.onerror = scheduleDrawFrame
+            img.dataset.sourceUrl = url
             img.src = url
             imageCacheRef.current.set(asset.id, img)
           }
@@ -312,15 +407,26 @@ export function PreviewPlayer() {
         if (asset.type === 'video') {
           activeVideoAssetIds.add(asset.id)
           let video = videoCacheRef.current.get(asset.id)
+          if (video?.dataset.sourceUrl !== url) {
+            if (video) releaseVideoElement(video)
+            videoCacheRef.current.delete(asset.id)
+            videoSyncKeyRef.current.delete(asset.id)
+            video = undefined
+          }
           if (!video) {
             video = document.createElement('video')
             video.muted = true
             video.playsInline = true
             video.preload = 'auto'
+            video.onloadeddata = scheduleDrawFrame
+            video.onseeked = scheduleDrawFrame
+            video.onerror = scheduleDrawFrame
+            video.dataset.sourceUrl = url
             video.src = url
             videoCacheRef.current.set(asset.id, video)
           }
           const targetTime = clampClipMediaTime(layer.clip, timelineTime)
+          video.playbackRate = layer.clip.playbackRate ?? 1
           const syncKey = makeVideoSyncKey(layer.clip)
           const previousSyncKey = videoSyncKeyRef.current.get(asset.id)
           const drift = Math.abs(video.currentTime - targetTime)
@@ -346,7 +452,7 @@ export function PreviewPlayer() {
         if (!activeVideoAssetIds.has(assetId)) video.pause()
       }
     },
-    []
+    [scheduleDrawFrame]
   )
 
   useEffect(() => {
@@ -375,69 +481,68 @@ export function PreviewPlayer() {
 
     for (const [assetId, video] of videoCacheRef.current) {
       if (!activeAssetIds.has(assetId)) {
-        video.pause()
-        video.removeAttribute('src')
-        video.load()
+        releaseVideoElement(video)
         videoCacheRef.current.delete(assetId)
         videoSyncKeyRef.current.delete(assetId)
       }
     }
 
-    for (const assetId of imageCacheRef.current.keys()) {
-      if (!activeAssetIds.has(assetId)) imageCacheRef.current.delete(assetId)
+    for (const [assetId, image] of imageCacheRef.current) {
+      if (!activeAssetIds.has(assetId)) {
+        releaseImageElement(image)
+        imageCacheRef.current.delete(assetId)
+      }
     }
   }, [assets])
 
   useEffect(() => {
-    const draw = () => {
-      const canvas = canvasRef.current
-      const ctx = canvas?.getContext('2d')
-      if (!canvas || !ctx) return
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.fillStyle = '#000'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    if (isPlaying) return
+    scheduleDrawFrame({ activeLayers, canvasHeight, canvasWidth, cropEditing, selectedClip })
+  }, [
+    activeLayers,
+    canvasHeight,
+    canvasWidth,
+    cropEditing,
+    isPlaying,
+    scheduleDrawFrame,
+    selectedClip,
+  ])
 
-      for (const layer of activeLayersRef.current) {
-        const { clip, track, asset } = layer
-        if (clip.clipType === 'media' && asset?.type === 'video') {
-          const video = videoCacheRef.current.get(asset.id)
-          if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-            ctx.save()
-            ctx.globalAlpha = Math.max(0, Math.min(1, clip.opacity * track.opacity))
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-            ctx.restore()
-          }
-          continue
-        }
-
-        withClipTransform(ctx, clip, track.opacity, () => {
-          if (clip.clipType === 'text') drawTextClip(ctx, clip)
-          else if (clip.clipType === 'shape') drawShapeClip(ctx, clip)
-          else if (asset?.type === 'image') {
-            const img = imageCacheRef.current.get(asset.id)
-            if (img?.complete) {
-              const source = getMediaSourceSize(
-                asset,
-                { width: img.naturalWidth, height: img.naturalHeight },
-                clip
-              )
-              drawImageLike(ctx, img, source.width, source.height, clip)
-            }
-          }
-        })
-      }
-
-      const shouldDrawSelection = activeToolRef.current === 'crop' && cropEditingRef.current
-      if (selectedClipRef.current && shouldDrawSelection)
-        drawSelection(ctx, selectedClipRef.current)
-      rafRef.current = requestAnimationFrame(draw)
+  useEffect(() => {
+    if (!isPlaying) return
+    let canceled = false
+    const drawLoop = () => {
+      rafRef.current = null
+      drawFrame()
+      if (!canceled) rafRef.current = requestAnimationFrame(drawLoop)
     }
-    rafRef.current = requestAnimationFrame(draw)
+    rafRef.current = requestAnimationFrame(drawLoop)
     return () => {
+      canceled = true
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
-  }, [])
+  }, [drawFrame, isPlaying])
+
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      if (playRafRef.current !== null) cancelAnimationFrame(playRafRef.current)
+      rafRef.current = null
+      playRafRef.current = null
+
+      for (const video of videoCacheRef.current.values()) {
+        releaseVideoElement(video)
+      }
+      for (const image of imageCacheRef.current.values()) {
+        releaseImageElement(image)
+      }
+      videoCacheRef.current.clear()
+      videoSyncKeyRef.current.clear()
+      imageCacheRef.current.clear()
+    },
+    []
+  )
 
   useEffect(() => {
     if (!isPlaying) {

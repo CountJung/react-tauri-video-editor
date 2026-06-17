@@ -1,8 +1,8 @@
-import { useHistoryStore } from '@/store/historyStore'
 import { useTimelineStore } from '@/store/timelineStore'
 import { useToolStore } from '@/store/toolStore'
 import type { ToolType } from '@/store/toolStore'
 import { useCallback, useEffect } from 'react'
+import { redoWithDirty, undoWithDirty } from './historyActions'
 import { withHistory } from './withHistory'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ const TOOL_KEY_MAP: Record<string, ToolType> = {
  * | Ctrl+O | 열기 |
  * | Space | 재생/일시정지 토글 |
  * | Delete/Backspace | 선택된 클립 삭제 |
+ * | Shift+Delete/Backspace | 선택된 클립 삭제 후 같은 트랙의 뒤쪽 클립 당기기 |
  * | V/T/R/C/A/X/S | 도구 선택 |
  */
 export function useGlobalShortcuts(handlers: ShortcutHandlers) {
@@ -66,14 +67,14 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
       // Undo: Ctrl+Z
       if (ctrl && key === 'z' && !e.shiftKey) {
         e.preventDefault()
-        useHistoryStore.getState().undo()
+        undoWithDirty()
         return
       }
 
       // Redo: Ctrl+Y 또는 Ctrl+Shift+Z
       if (ctrl && (key === 'y' || (key === 'z' && e.shiftKey))) {
         e.preventDefault()
-        useHistoryStore.getState().redo()
+        redoWithDirty()
         return
       }
 
@@ -119,7 +120,15 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
         const { selectedClipId } = useTimelineStore.getState()
         if (selectedClipId) {
           e.preventDefault()
-          withHistory('클립 삭제', () => useTimelineStore.getState().removeClip(selectedClipId))
+          const label = e.shiftKey ? '갭 제거 삭제' : '클립 삭제'
+          withHistory(label, () => {
+            const timeline = useTimelineStore.getState()
+            if (e.shiftKey) {
+              timeline.deleteGap(selectedClipId)
+            } else {
+              timeline.removeClip(selectedClipId)
+            }
+          })
         }
         return
       }

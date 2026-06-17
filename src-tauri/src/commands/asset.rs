@@ -1,5 +1,6 @@
 use crate::commands::common::AppError;
 use std::path::Path;
+use uuid::Uuid;
 
 const VIDEO_EXTS: &[&str] = &["mp4", "mov", "avi", "mkv", "webm"];
 const AUDIO_EXTS: &[&str] = &["mp3", "wav", "aac", "flac", "ogg", "m4a"];
@@ -54,7 +55,7 @@ pub async fn asset_import(path: String) -> Result<AssetMeta, AppError> {
         .to_string();
 
     Ok(AssetMeta {
-        id: uuid_v4(),
+        id: Uuid::new_v4().to_string(),
         name,
         path,
         asset_type: asset_type.to_string(),
@@ -118,7 +119,7 @@ pub async fn asset_probe(app: tauri::AppHandle, path: String) -> Result<AssetMet
         .to_string();
 
     Ok(AssetMeta {
-        id: uuid_v4(),
+        id: Uuid::new_v4().to_string(),
         name,
         path,
         asset_type: asset_type.to_string(),
@@ -126,20 +127,4 @@ pub async fn asset_probe(app: tauri::AppHandle, path: String) -> Result<AssetMet
         width,
         height,
     })
-}
-
-fn uuid_v4() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    format!(
-        "{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
-        t,
-        t >> 8,
-        t & 0xfff,
-        t >> 4,
-        t as u64
-    )
 }

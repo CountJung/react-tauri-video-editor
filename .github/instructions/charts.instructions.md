@@ -18,12 +18,41 @@ applyTo: "src/components/timeline/**"
 ## 2. Track / Clip 데이터 모델
 
 ```ts
-type Track = { id: string; type: 'video' | 'audio'; clips: Clip[] }
-type Clip  = { id: string; assetId: string; start: number; duration: number; trimStart: number; trimEnd: number }
+type Track = {
+  id: string
+  type: 'video' | 'audio' | 'overlay' | 'text' | 'shape'
+  clips: Clip[]
+  visible: boolean
+  locked: boolean
+  opacity: number
+  zIndex: number
+}
+type Clip = {
+  id: string
+  assetId: string
+  start: number
+  duration: number
+  trimStart: number
+  trimEnd: number
+  playbackRate: number
+  fadeInDuration: number
+  fadeOutDuration: number
+  keyframes: Array<{
+    time: number
+    x: number
+    y: number
+    width: number
+    height: number
+    opacity: number
+  }>
+}
 ```
 
 - `start` = 타임라인 기준 배치 위치(초).
 - `trimStart` / `trimEnd` = 원본 영상 내 자르기 시작·끝(초).
+- `playbackRate`는 원본 시간 매핑과 표시 duration에 함께 반영한다.
+- `fadeInDuration` / `fadeOutDuration`은 Canvas 합성 opacity에 반영한다.
+- `keyframes`는 클립 시작 기준 시간에 위치·크기·불투명도를 저장하고 프리뷰에서 선형 보간한다.
 
 ## 3. Drag & Drop (dnd-kit)
 

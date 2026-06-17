@@ -9,8 +9,16 @@
  * - rustc -vV 로 호스트 triple 자동 감지
  */
 
-import { execSync, execFileSync } from 'node:child_process'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, rmSync } from 'node:fs'
+import { execFileSync, execSync } from 'node:child_process'
+import {
+  copyFileSync,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  unlinkSync,
+} from 'node:fs'
 import { get } from 'node:https'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,6 +29,15 @@ const BINARIES_DIR = join(ROOT, 'src-tauri', 'binaries')
 // 임시 디렉터리를 프로젝트 내부에 두어 크로스 드라이브 rename 오류 방지
 const TMP_DIR = join(ROOT, 'src-tauri', 'binaries', '.tmp')
 const FFBINARIES_API = 'https://ffbinaries.com/api/v1/version/latest'
+const TARGETS = [
+  { triple: 'x86_64-pc-windows-msvc', platform: 'windows-64', ext: '.exe', label: 'windows-x64' },
+  { triple: 'x86_64-apple-darwin', platform: 'osx-64', ext: '', label: 'macos-x64' },
+  // ffbinaries does not publish a native macOS arm64 build; keep the Tauri sidecar filename for
+  // the arm64 bundle and use the osx-64 compatibility binary. Verify on Apple Silicon CI.
+  { triple: 'aarch64-apple-darwin', platform: 'osx-64', ext: '', label: 'macos-arm64-rosetta' },
+  { triple: 'x86_64-unknown-linux-gnu', platform: 'linux-64', ext: '', label: 'linux-x64' },
+  { triple: 'aarch64-unknown-linux-gnu', platform: 'linux-arm64', ext: '', label: 'linux-arm64' },
+]
 
 // ── Rust host triple ────────────────────────────────────────────────────────
 function getRustTriple() {
@@ -30,20 +47,23 @@ function getRustTriple() {
     if (!m) throw new Error('host triple not found in rustc -vV output')
     return m[1]
   } catch (e) {
-    throw new Error(`rustc를 찾을 수 없습니다: ${e.message}\nRust toolchain이 설치되어 있는지 확인하세요.`)
+    throw new Error(
+      `rustc를 찾을 수 없습니다: ${e.message}\nRust toolchain이 설치되어 있는지 확인하세요.`
+    )
   }
 }
 
-// ── Rust triple → ffbinaries 플랫폼 키 ─────────────────────────────────────
-// ffbinaries.com은 macOS ARM64(osx-arm-64) 빌드를 제공하지 않습니다.
-// Apple Silicon(aarch64)은 Rosetta 2를 통해 x86_64(osx-64) 바이너리를 실행합니다.
-function getFfbinariesPlatform(triple) {
-  if (triple.includes('windows')) return 'windows-64'
-  if (triple.includes('apple')) return 'osx-64'
-  if (triple.includes('linux') && triple.includes('aarch64')) return 'linux-arm64'
-  if (triple.includes('linux') && triple.includes('armv7')) return 'linux-armhf'
-  if (triple.includes('linux')) return 'linux-64'
-  throw new Error(`지원하지 않는 플랫폼: ${triple}`)
+function getTargetByTriple(triple) {
+  const target = TARGETS.find((candidate) => candidate.triple === triple)
+  if (!target) throw new Error(`지원하지 않는 플랫폼: ${triple}`)
+  return target
+}
+
+function getRequestedTargets(hostTriple) {
+  const targetArg = process.argv.find((arg) => arg.startsWith('--target='))
+  if (process.argv.includes('--all')) return TARGETS
+  if (targetArg) return [getTargetByTriple(targetArg.slice('--target='.length))]
+  return [getTargetByTriple(hostTriple)]
 }
 
 // ── HTTP(S) 다운로드 (리다이렉트 지원) ──────────────────────────────────────
@@ -56,15 +76,20 @@ function download(url, destPath) {
           file.close()
           // 임시 파일을 재사용하기 위해 다시 열어서 redirect
           const redir = createWriteStream(destPath)
-          return get(res.headers.location, (r) => { r.pipe(redir); redir.on('finish', () => redir.close(ok)) })
-            .on('error', fail)
+          return get(res.headers.location, (r) => {
+            r.pipe(redir)
+            redir.on('finish', () => redir.close(ok))
+          }).on('error', fail)
         }
         if (res.statusCode !== 200) {
           return fail(new Error(`HTTP ${res.statusCode}: ${targetUrl}`))
         }
         res.pipe(file)
         file.on('finish', () => file.close(ok))
-      }).on('error', (e) => { file.close(); fail(e) })
+      }).on('error', (e) => {
+        file.close()
+        fail(e)
+      })
     req(url)
   })
 }
@@ -75,7 +100,7 @@ function extractZip(zipPath, destDir) {
   if (process.platform === 'win32') {
     execSync(
       `powershell -NoProfile -NonInteractive -Command "Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${destDir}'"`,
-      { stdio: 'inherit' },
+      { stdio: 'inherit' }
     )
   } else {
     execSync(`unzip -o "${zipPath}" -d "${destDir}"`, { stdio: 'inherit' })
@@ -111,21 +136,28 @@ async function main() {
   console.log('=== FFmpeg 사이드카 바이너리 다운로드 ===\n')
 
   const triple = getRustTriple()
-  const platform = getFfbinariesPlatform(triple)
-  const ext = process.platform === 'win32' ? '.exe' : ''
+  const requestedTargets = getRequestedTargets(triple)
 
   console.log(`Rust host triple : ${triple}`)
-  console.log(`ffbinaries 플랫폼: ${platform}`)
+  console.log(`대상 플랫폼      : ${requestedTargets.map((target) => target.label).join(', ')}`)
   console.log(`출력 디렉터리    : ${BINARIES_DIR}\n`)
 
   if (!existsSync(BINARIES_DIR)) {
     mkdirSync(BINARIES_DIR, { recursive: true })
   }
 
-  const targets = [
-    { tool: 'ffmpeg', dest: join(BINARIES_DIR, `ffmpeg-${triple}${ext}`) },
-    { tool: 'ffprobe', dest: join(BINARIES_DIR, `ffprobe-${triple}${ext}`) },
-  ]
+  const targets = requestedTargets.flatMap((target) => [
+    {
+      ...target,
+      tool: 'ffmpeg',
+      dest: join(BINARIES_DIR, `ffmpeg-${target.triple}${target.ext}`),
+    },
+    {
+      ...target,
+      tool: 'ffprobe',
+      dest: join(BINARIES_DIR, `ffprobe-${target.triple}${target.ext}`),
+    },
+  ])
 
   const allExist = targets.every(({ dest }) => existsSync(dest))
   if (allExist) {
@@ -136,19 +168,19 @@ async function main() {
 
   console.log('ffbinaries API 조회 중...')
   const data = await fetchJson(FFBINARIES_API)
-  const bins = data.bin?.[platform]
-  if (!bins) throw new Error(`플랫폼 '${platform}'의 다운로드 URL을 찾을 수 없습니다.`)
   console.log(`ffbinaries 버전  : ${data.version}\n`)
 
   // 임시 디렉터리를 프로젝트 내부(same drive)에 생성
   if (!existsSync(TMP_DIR)) mkdirSync(TMP_DIR, { recursive: true })
 
-  for (const { tool, dest } of targets) {
+  for (const { tool, dest, platform, triple: targetTriple } of targets) {
     if (existsSync(dest)) {
       console.log(`✓ ${tool} 이미 존재 — 건너뜀`)
       continue
     }
 
+    const bins = data.bin?.[platform]
+    if (!bins) throw new Error(`플랫폼 '${platform}'의 다운로드 URL을 찾을 수 없습니다.`)
     const url = bins[tool]
     if (!url) throw new Error(`${tool}의 다운로드 URL 없음 (플랫폼: ${platform})`)
 
@@ -159,7 +191,7 @@ async function main() {
     if (existsSync(zipPath)) unlinkSync(zipPath)
     if (existsSync(extractDir)) rmSync(extractDir, { recursive: true, force: true })
 
-    console.log(`⬇  ${tool} 다운로드 중...`)
+    console.log(`⬇  ${tool} 다운로드 중... (${targetTriple})`)
     console.log(`   URL: ${url}`)
     await download(url, zipPath)
     console.log('   압축 해제 중...')

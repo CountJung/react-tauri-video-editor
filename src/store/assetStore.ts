@@ -16,6 +16,16 @@ interface AssetActions {
   clearAssets: () => void
 }
 
+function revokeAssetUrls(asset: Asset): void {
+  if (typeof URL === 'undefined') return
+  const urls = [asset.path, asset.thumbnailPath].filter(
+    (url): url is string => typeof url === 'string' && url.startsWith('blob:')
+  )
+  for (const url of new Set(urls)) {
+    URL.revokeObjectURL(url)
+  }
+}
+
 export const useAssetStore = create<AssetState & AssetActions>((set) => ({
   assets: [],
   selectedAssetId: null,
@@ -29,9 +39,14 @@ export const useAssetStore = create<AssetState & AssetActions>((set) => ({
     })),
 
   removeAsset: (id) =>
-    set((state) => ({
-      assets: state.assets.filter((a) => a.id !== id),
-    })),
+    set((state) => {
+      const asset = state.assets.find((a) => a.id === id)
+      if (asset) revokeAssetUrls(asset)
+      return {
+        assets: state.assets.filter((a) => a.id !== id),
+        selectedAssetId: state.selectedAssetId === id ? null : state.selectedAssetId,
+      }
+    }),
 
   updateAsset: (id, updates) =>
     set((state) => ({
@@ -45,7 +60,17 @@ export const useAssetStore = create<AssetState & AssetActions>((set) => ({
 
   setSelectedAsset: (id) => set({ selectedAssetId: id }),
 
-  loadAssets: (assets) => set({ assets, selectedAssetId: null }),
+  loadAssets: (assets) =>
+    set((state) => {
+      for (const asset of state.assets) {
+        if (!assets.some((nextAsset) => nextAsset.path === asset.path)) revokeAssetUrls(asset)
+      }
+      return { assets, selectedAssetId: null }
+    }),
 
-  clearAssets: () => set({ assets: [], selectedAssetId: null }),
+  clearAssets: () =>
+    set((state) => {
+      for (const asset of state.assets) revokeAssetUrls(asset)
+      return { assets: [], selectedAssetId: null }
+    }),
 }))

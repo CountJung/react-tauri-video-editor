@@ -45,11 +45,79 @@ export function getMediaSourceSize(
 }
 
 export function getClipLocalTime(clip: Clip, timelineTime: number): number {
-  return clip.trimStart + (timelineTime - clip.start)
+  return clip.trimStart + (timelineTime - clip.start) * (clip.playbackRate ?? 1)
 }
 
 export function isClipActive(clip: Clip, timelineTime: number): boolean {
   return timelineTime >= clip.start && timelineTime < clip.start + clip.duration
+}
+
+export function getClipFadeOpacity(clip: Clip, timelineTime: number): number {
+  const localTime = timelineTime - clip.start
+  const remainingTime = clip.duration - localTime
+  const fadeIn = Math.max(0, clip.fadeInDuration ?? 0)
+  const fadeOut = Math.max(0, clip.fadeOutDuration ?? 0)
+  const fadeInOpacity = fadeIn > 0 ? Math.min(1, Math.max(0, localTime / fadeIn)) : 1
+  const fadeOutOpacity = fadeOut > 0 ? Math.min(1, Math.max(0, remainingTime / fadeOut)) : 1
+  return Math.min(fadeInOpacity, fadeOutOpacity)
+}
+
+function interpolateKeyframeValue(
+  baseValue: number,
+  timelineTime: number,
+  clipStart: number,
+  keyframes: Array<{ time: number; value: number }>
+): number {
+  const localTime = timelineTime - clipStart
+  const points = [{ time: 0, value: baseValue }, ...keyframes].sort((a, b) => a.time - b.time)
+  let previous = points[0]
+  for (const point of points) {
+    if (point.time <= localTime) previous = point
+  }
+  const next = points.find((point) => point.time > localTime)
+  if (!previous || !next) return previous?.value ?? baseValue
+  const span = next.time - previous.time
+  if (span <= 0) return next.value
+  const amount = (localTime - previous.time) / span
+  return previous.value + (next.value - previous.value) * amount
+}
+
+export function resolveClipKeyframes(clip: Clip, timelineTime: number): Clip {
+  if (!clip.keyframes.length) return clip
+  const keyframes = clip.keyframes
+  return {
+    ...clip,
+    x: interpolateKeyframeValue(
+      clip.x,
+      timelineTime,
+      clip.start,
+      keyframes.map((keyframe) => ({ time: keyframe.time, value: keyframe.x }))
+    ),
+    y: interpolateKeyframeValue(
+      clip.y,
+      timelineTime,
+      clip.start,
+      keyframes.map((keyframe) => ({ time: keyframe.time, value: keyframe.y }))
+    ),
+    width: interpolateKeyframeValue(
+      clip.width,
+      timelineTime,
+      clip.start,
+      keyframes.map((keyframe) => ({ time: keyframe.time, value: keyframe.width }))
+    ),
+    height: interpolateKeyframeValue(
+      clip.height,
+      timelineTime,
+      clip.start,
+      keyframes.map((keyframe) => ({ time: keyframe.time, value: keyframe.height }))
+    ),
+    opacity: interpolateKeyframeValue(
+      clip.opacity,
+      timelineTime,
+      clip.start,
+      keyframes.map((keyframe) => ({ time: keyframe.time, value: keyframe.opacity }))
+    ),
+  }
 }
 
 export function collectActiveLayers(
@@ -64,7 +132,7 @@ export function collectActiveLayers(
         .filter((clip) => isClipActive(clip, timelineTime))
         .map((clip) => ({
           track,
-          clip,
+          clip: resolveClipKeyframes(clip, timelineTime),
           asset: clip.assetId ? assets.find((asset) => asset.id === clip.assetId) : undefined,
         }))
     )

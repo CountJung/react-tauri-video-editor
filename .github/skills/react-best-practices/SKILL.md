@@ -61,13 +61,20 @@ useEffect(() => {
 }, [loadData]);
 ```
 
+### 미디어/RAF cleanup
+
+- PreviewPlayer의 video/image cache는 asset 삭제, 프로젝트 로드, 컴포넌트 unmount 시 `src`와 이벤트 핸들러를 해제하고 map을 비운다.
+- 브라우저 fallback에서 생성한 `blob:` URL은 AssetStore에서 asset이 제거되거나 교체될 때 `URL.revokeObjectURL()`로 해제한다.
+- Canvas redraw는 재생 중에만 RAF loop를 유지한다. 정지 상태에서는 timeline/asset/selection/canvas 입력이 바뀌거나 media load/seek가 끝났을 때 한 프레임만 예약한다.
+- 새 media cache를 추가할 때는 asset id만 보지 말고 source URL 변경도 감지해 오래된 element를 release한다.
+
 ---
 
 ## State 분류 규칙
 
 | 데이터 종류 | 훅 |
 |---|---|
-| DB 결과, 필터, 선택값, 페이지네이션 | `useStickyState` (SPA 생애 동안 유지) |
+| 작은 UI 설정, 패널 크기, zoom, 선택값 | `useStickyState` (localStorage 유지) |
 | 로딩/에러/다이얼로그 상태 | `useState` |
 | 렌더에 불필요한 mutable 값 | `useRef` |
 
@@ -78,8 +85,8 @@ useEffect(() => {
 ```tsx
 // ✅ tauriInvoke 에러는 AppError 객체 — String() 사용 금지
 } catch (e) {
-  showSnack(toAppError(e).message, "error");  // ✅
-  // showSnack(String(e), "error");           // ❌ "[object Object]" 출력
+  setErrorMessage(toAppError(e).message);  // ✅
+  // setErrorMessage(String(e));           // ❌ "[object Object]" 출력
 }
 ```
 
@@ -88,8 +95,8 @@ useEffect(() => {
 ## 성능 원칙
 
 - 컴포넌트 외부에서 변하지 않는 상수/배열/객체는 **컴포넌트 밖**에 정의
-- 무거운 컴포넌트(Monaco Editor 등)는 **동적 import** 고려
+- 무거운 route body/dialog/editor panel/settings/media tool은 **동적 import** 고려
 - `pnpm build:vite`에서 500kB+ chunk 경고가 발생하면 `$project-structure-review-agent` 기준으로 구조를 검토하고, route body/dialog/editor panel/settings/media tool을 `React.lazy` 또는 동적 `import()`로 먼저 분리한다.
 - 경고 제거만을 위해 `build.chunkSizeWarningLimit`를 올리는 것은 마지막 수단이다. Tauri 데스크톱 번들에서 허용 가능한 크기라는 판단과 기록이 있을 때만 사용한다.
-- 긴 목록 → DataGrid 사용 (가상화 내장), 직접 `map` 렌더 삼가
+- 긴 목록 → 페이지네이션, 가상화, 또는 행 단위 memoization을 검토하고 무제한 `map` 렌더를 피한다
 - 이벤트 핸들러에서 직접 `setState` 호출 (useEffect를 통한 연쇄 setState 지양)

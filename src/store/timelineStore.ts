@@ -58,6 +58,15 @@ export interface CropRect {
   height: number
 }
 
+export interface ClipKeyframe {
+  time: number
+  x: number
+  y: number
+  width: number
+  height: number
+  opacity: number
+}
+
 export interface Clip {
   id: string
   assetId: string // text/shape clip은 '' (빈 문자열)
@@ -73,6 +82,10 @@ export interface Clip {
   height: number
   rotation: number // 도(°)
   opacity: number // 0~1 (클립 개별 불투명도)
+  playbackRate: number // 미디어 재생 속도 (0.25x~4x)
+  fadeInDuration: number // 초
+  fadeOutDuration: number // 초
+  keyframes: ClipKeyframe[]
   fitMode: FitMode
   cropRect?: CropRect
   // 타입별 확장 속성
@@ -129,6 +142,18 @@ function calcDuration(tracks: Track[]): number {
   )
 }
 
+function clampPlaybackRate(rate: number | undefined): number {
+  return Math.max(0.25, Math.min(4, rate ?? 1))
+}
+
+function getTrimmedTimelineDuration(
+  trimStart: number,
+  trimEnd: number,
+  playbackRate: number | undefined
+): number {
+  return Math.max(0.1, (trimEnd - trimStart) / clampPlaybackRate(playbackRate))
+}
+
 function isCanvasSizedMediaClip(clip: Clip, canvasW: number, canvasH: number): boolean {
   return (
     clip.clipType === 'media' &&
@@ -161,12 +186,20 @@ function normalizeLegacyMediaClipBounds(
   return tracks.map((track) => ({
     ...track,
     clips: track.clips.map((clip) => {
-      if (track.type === 'video' && clip.clipType === 'media') {
-        return frameClipToCanvas(clip, canvasW, canvasH)
+      const normalizedClip = {
+        ...clip,
+        playbackRate: clampPlaybackRate(clip.playbackRate),
+        fadeInDuration: clip.fadeInDuration ?? 0,
+        fadeOutDuration: clip.fadeOutDuration ?? 0,
+        keyframes: clip.keyframes ?? [],
       }
-      return isCanvasSizedMediaClip(clip, canvasW, canvasH) && (clip.x < 0 || clip.y < 0)
-        ? { ...clip, x: 0, y: 0 }
-        : clip
+      if (track.type === 'video' && normalizedClip.clipType === 'media') {
+        return frameClipToCanvas(normalizedClip, canvasW, canvasH)
+      }
+      return isCanvasSizedMediaClip(normalizedClip, canvasW, canvasH) &&
+        (normalizedClip.x < 0 || normalizedClip.y < 0)
+        ? { ...normalizedClip, x: 0, y: 0 }
+        : normalizedClip
     }),
   }))
 }
@@ -181,16 +214,23 @@ function normalizeMediaClipBoundsForCanvasResize(
   return tracks.map((track) => ({
     ...track,
     clips: track.clips.map((clip) => {
-      if (track.type === 'video' && clip.clipType === 'media') {
-        return frameClipToCanvas(clip, newCanvasW, newCanvasH)
+      const normalizedClip = {
+        ...clip,
+        playbackRate: clampPlaybackRate(clip.playbackRate),
+        fadeInDuration: clip.fadeInDuration ?? 0,
+        fadeOutDuration: clip.fadeOutDuration ?? 0,
+        keyframes: clip.keyframes ?? [],
+      }
+      if (track.type === 'video' && normalizedClip.clipType === 'media') {
+        return frameClipToCanvas(normalizedClip, newCanvasW, newCanvasH)
       }
       if (
-        isCanvasSizedMediaClip(clip, oldCanvasW, oldCanvasH) ||
-        isCanvasSizedMediaClip(clip, newCanvasW, newCanvasH)
+        isCanvasSizedMediaClip(normalizedClip, oldCanvasW, oldCanvasH) ||
+        isCanvasSizedMediaClip(normalizedClip, newCanvasW, newCanvasH)
       ) {
-        return { ...clip, x: 0, y: 0, width: newCanvasW, height: newCanvasH }
+        return { ...normalizedClip, x: 0, y: 0, width: newCanvasW, height: newCanvasH }
       }
-      return clip
+      return normalizedClip
     }),
   }))
 }
@@ -294,6 +334,10 @@ export type ClipCanvasUpdate = Partial<
     | 'height'
     | 'rotation'
     | 'opacity'
+    | 'playbackRate'
+    | 'fadeInDuration'
+    | 'fadeOutDuration'
+    | 'keyframes'
     | 'fitMode'
     | 'cropRect'
     | 'textProps'
@@ -317,7 +361,9 @@ interface TimelineActions {
   trimClipStart: (clipId: string, newTrimStart: number) => void
   trimClipEnd: (clipId: string, newTrimEnd: number) => void
   removeClip: (clipId: string) => void
+  deleteGap: (clipId: string) => void
   splitClip: (clipId: string, atTime: number) => void
+  ripplePushClips: (trackId: string, fromTime: number, delta: number) => void
 
   // 텍스트 & 도형 클립
   addTextClip: (
@@ -429,6 +475,10 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         ...rect,
         rotation: 0,
         opacity: 1,
+        playbackRate: 1,
+        fadeInDuration: 0,
+        fadeOutDuration: 0,
+        keyframes: [],
         fitMode: 'fit',
       }
       const newTracks = state.tracks.map((t) =>
@@ -459,8 +509,14 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         clips: t.clips.map((c) => {
           if (c.id !== clipId) return c
           const trimStart = Math.max(0, Math.min(newTrimStart, c.trimEnd - 0.1))
-          const duration = c.trimEnd - trimStart
-          return { ...c, trimStart, start: c.start + (trimStart - c.trimStart), duration }
+          const playbackRate = clampPlaybackRate(c.playbackRate)
+          const duration = getTrimmedTimelineDuration(trimStart, c.trimEnd, playbackRate)
+          return {
+            ...c,
+            trimStart,
+            start: c.start + (trimStart - c.trimStart) / playbackRate,
+            duration,
+          }
         }),
       }))
       return { tracks: newTracks, duration: calcDuration(newTracks) }
@@ -473,7 +529,11 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         clips: t.clips.map((c) => {
           if (c.id !== clipId) return c
           const trimEnd = Math.max(c.trimStart + 0.1, newTrimEnd)
-          return { ...c, trimEnd, duration: trimEnd - c.trimStart }
+          return {
+            ...c,
+            trimEnd,
+            duration: getTrimmedTimelineDuration(c.trimStart, trimEnd, c.playbackRate),
+          }
         }),
       }))
       return { tracks: newTracks, duration: calcDuration(newTracks) }
@@ -488,25 +548,68 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
       return { tracks: newTracks, duration: calcDuration(newTracks), selectedClipId: null }
     }),
 
+  deleteGap: (clipId) =>
+    set((state) => {
+      const targetTrack = state.tracks.find((track) =>
+        track.clips.some((clip) => clip.id === clipId)
+      )
+      const targetClip = targetTrack?.clips.find((clip) => clip.id === clipId)
+      if (!targetTrack || !targetClip) return state
+
+      const targetEnd = targetClip.start + targetClip.duration
+      const newTracks = state.tracks.map((track) => {
+        if (track.id !== targetTrack.id) return track
+
+        return {
+          ...track,
+          clips: track.clips
+            .filter((clip) => clip.id !== clipId)
+            .map((clip) =>
+              clip.start >= targetEnd
+                ? { ...clip, start: Math.max(0, clip.start - targetClip.duration) }
+                : clip
+            ),
+        }
+      })
+      return { tracks: newTracks, duration: calcDuration(newTracks), selectedClipId: null }
+    }),
+
   splitClip: (clipId, atTime) =>
     set((state) => {
       const newTracks = state.tracks.map((t) => {
         const clip = t.clips.find((c) => c.id === clipId)
         if (!clip || atTime <= clip.start || atTime >= clip.start + clip.duration) return t
 
+        const playbackRate = clampPlaybackRate(clip.playbackRate)
         const leftDur = atTime - clip.start
         const rightDur = clip.duration - leftDur
-        const leftClip: Clip = { ...clip, duration: leftDur, trimEnd: clip.trimStart + leftDur }
+        const splitTrimTime = clip.trimStart + leftDur * playbackRate
+        const leftClip: Clip = { ...clip, duration: leftDur, trimEnd: splitTrimTime }
         const rightClip: Clip = {
           ...clip,
           id: crypto.randomUUID(),
           start: atTime,
           duration: rightDur,
-          trimStart: clip.trimStart + leftDur,
+          trimStart: splitTrimTime,
         }
         return {
           ...t,
           clips: t.clips.flatMap((c) => (c.id === clipId ? [leftClip, rightClip] : [c])),
+        }
+      })
+      return { tracks: newTracks, duration: calcDuration(newTracks) }
+    }),
+
+  ripplePushClips: (trackId, fromTime, delta) =>
+    set((state) => {
+      if (delta <= 0) return state
+      const newTracks = state.tracks.map((track) => {
+        if (track.id !== trackId) return track
+        return {
+          ...track,
+          clips: track.clips.map((clip) =>
+            clip.start >= fromTime ? { ...clip, start: clip.start + delta } : clip
+          ),
         }
       })
       return { tracks: newTracks, duration: calcDuration(newTracks) }
@@ -541,6 +644,10 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         height: placement?.height ?? 120,
         rotation: 0,
         opacity: 1,
+        playbackRate: 1,
+        fadeInDuration: 0,
+        fadeOutDuration: 0,
+        keyframes: [],
         fitMode: 'fit',
         textProps: defaultText,
       }
@@ -567,6 +674,10 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
         height: h,
         rotation: 0,
         opacity: 1,
+        playbackRate: 1,
+        fadeInDuration: 0,
+        fadeOutDuration: 0,
+        keyframes: [],
         fitMode: 'fit',
         shapeProps: { shapeType, fill: '#3a7bd5', stroke: 'transparent', strokeWidth: 0 },
       }
@@ -579,12 +690,25 @@ export const useTimelineStore = create<TimelineState & TimelineActions>((set, ge
   // ── Canvas 변환 ──────────────────────────────────────────────────────────
 
   updateClipCanvas: (clipId, update) =>
-    set((state) => ({
-      tracks: state.tracks.map((t) => ({
-        ...t,
-        clips: t.clips.map((c) => (c.id === clipId ? { ...c, ...update } : c)),
-      })),
-    })),
+    set((state) => {
+      const newTracks = state.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) => {
+          if (clip.id !== clipId) return clip
+          const playbackRate = clampPlaybackRate(update.playbackRate ?? clip.playbackRate)
+          return {
+            ...clip,
+            ...update,
+            playbackRate,
+            duration:
+              update.playbackRate !== undefined && clip.clipType === 'media'
+                ? getTrimmedTimelineDuration(clip.trimStart, clip.trimEnd, playbackRate)
+                : clip.duration,
+          }
+        }),
+      }))
+      return { tracks: newTracks, duration: calcDuration(newTracks) }
+    }),
 
   fitClipToCanvas: (clipId) =>
     set((state) => ({

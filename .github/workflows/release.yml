@@ -58,6 +58,9 @@ jobs:
       - name: Download FFmpeg sidecar binaries
         run: pnpm install-ffmpeg
 
+      - name: Verify FFmpeg sidecar binaries
+        run: pnpm verify:ffmpeg-sidecars
+
       # ── .env 주입 (GitHub Secret → 프로젝트 루트 .env) ──
       # Secret 'APP_ENV'에 .env 파일 전체 내용을 저장하세요.
       - name: Create .env
@@ -151,6 +154,9 @@ jobs:
       # ── FFmpeg sidecar 다운로드 (macOS aarch64) ──
       - name: Download FFmpeg sidecar binaries
         run: pnpm install-ffmpeg
+
+      - name: Verify FFmpeg sidecar binaries
+        run: pnpm verify:ffmpeg-sidecars
 
       # ── .env 주입 ──
       - name: Create .env
@@ -252,6 +258,9 @@ jobs:
       - name: Download FFmpeg sidecar binaries
         run: pnpm install-ffmpeg
 
+      - name: Verify FFmpeg sidecar binaries
+        run: pnpm verify:ffmpeg-sidecars
+
       - name: Create .env
         run: printf '%s' "$APP_ENV" > .env
         env:
@@ -307,11 +316,45 @@ jobs:
           if-no-files-found: error
 
 # ═══════════════════════════════════════════════════════════════
-# JOB 4 — GitHub Release 생성 & 파일 첨부
+# JOB 4 — Linux sidecar smoke test
+# ═══════════════════════════════════════════════════════════════
+  verify-linux-sidecars:
+    name: Linux FFmpeg Sidecar Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download FFmpeg sidecar binaries
+        run: pnpm install-ffmpeg
+
+      - name: Verify FFmpeg sidecar binaries
+        run: pnpm verify:ffmpeg-sidecars
+
+# ═══════════════════════════════════════════════════════════════
+# JOB 5 — GitHub Release 생성 & 파일 첨부
 # ═══════════════════════════════════════════════════════════════
   create-release:
     name: Create GitHub Release
-    needs: [build-windows, build-macos-arm64, build-macos-x86_64]
+    needs: [build-windows, build-macos-arm64, build-macos-x86_64, verify-linux-sidecars]
     runs-on: ubuntu-latest
 
     steps:

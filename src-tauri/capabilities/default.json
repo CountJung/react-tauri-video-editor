@@ -7,10 +7,22 @@
     "core:default",
     "core:window:allow-close",
     "core:window:allow-destroy",
-    "shell:allow-execute",
-    "shell:allow-open",
-    "fs:default",
-    "dialog:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        { "name": "binaries/ffmpeg", "sidecar": true, "args": true },
+        { "name": "binaries/ffprobe", "sidecar": true, "args": true }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        { "name": "binaries/ffmpeg", "sidecar": true, "args": true },
+        { "name": "binaries/ffprobe", "sidecar": true, "args": true }
+      ]
+    },
+    "dialog:allow-open",
+    "dialog:allow-save",
     "window-state:default"
   ]
 }

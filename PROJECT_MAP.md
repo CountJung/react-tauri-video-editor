@@ -48,7 +48,7 @@
 | Tool toolbar | `src/components/toolbar/ToolPanel.tsx` | `src/store/toolStore.ts` |
 | Settings screen | `src/routes/settings.tsx` | `src/components/settings/SettingsPage.tsx`, `src/store/settingsStore.ts` |
 | Project create/open/save format | `src/store/projectStore.ts` | `src/lib/projectSerialization.ts`, `src/components/project/NewProjectDialog.tsx`, `src-tauri/src/commands/project.rs` |
-| Undo/redo history | `src/store/historyStore.ts` | `src/lib/withHistory.ts`, `src/components/app/GlobalAppBar.tsx` |
+| Undo/redo history | `src/store/historyStore.ts` | `src/lib/withHistory.ts`, `src/lib/historyActions.ts`, `src/components/app/GlobalAppBar.tsx` |
 | Tauri IPC wrapper | `src/lib/invoke.ts` | `src-tauri/src/commands/common.rs`, `src-tauri/src/lib.rs` |
 | Rust command wiring | `src-tauri/src/lib.rs` | `src-tauri/src/commands/mod.rs`, `src-tauri/src/commands/*.rs` |
 | Build/chunk warnings | `vite.config.ts` | `.agents/skills/project-structure-review-agent/SKILL.md`, `src/routes/*`, lazy component boundaries |
@@ -66,6 +66,7 @@
 | `MasterPlan.md` | Original product/development plan. Use as historical phase context. |
 | `package.json` | Frontend scripts and dependency list. |
 | `pnpm-lock.yaml` | Package lockfile. Do not hand-edit. |
+| `.env.example` | Local environment template for Vite defaults and Rust build-time public settings. |
 | `vite.config.ts` | Vite/Tauri dev server and build config. |
 | `tsconfig.json` | TypeScript compiler config. |
 | `biome.json` | Biome formatting/lint config. |
@@ -105,9 +106,13 @@
 | `src/components/preview/PreviewPlayer.tsx` | Canvas preview player, media sync, playback controls, canvas editing interactions. |
 | `src/components/preview/canvasCompositor.ts` | Pure compositor helpers for media/text/shape drawing, hit testing, fit calculations. |
 | `src/components/preview/canvasCompositor.test.ts` | Vitest coverage for compositor behavior. |
+| `src/components/preview/exportPayload.ts` | Pure ExportDialog payload builder and export resolution/FPS scaling helpers. |
+| `src/components/preview/exportPayload.test.ts` | Preview-to-export payload consistency fixture tests. |
 | `src/components/preview/ExportDialog.tsx` | Export options/progress dialog. |
 | `src/components/timeline/TimelinePanel.tsx` | Timeline ruler, tracks, clips, layer panel, trim, zoom, layer reorder. |
 | `src/components/properties/PropertiesPanel.tsx` | Right sidebar for selected clip/tool/canvas properties and crop edit controls. |
+| `src/components/properties/HistoryPanel.tsx` | Properties sidebar history tab with undo/redo snapshot list and jump actions. |
+| `src/components/properties/KeyframePanel.tsx` | Properties sidebar keyframe controls for clip position, size, and opacity animation. |
 | `src/components/toolbar/ToolPanel.tsx` | Vertical tool selector. |
 | `src/components/project/NewProjectDialog.tsx` | New project creation dialog. |
 | `src/components/settings/SettingsPage.tsx` | Settings page content for theme, zoom, snap interval. |
@@ -135,6 +140,8 @@
 | `src/lib/useStickyState.ts` | Sticky localStorage-backed state hook. |
 | `src/lib/useGlobalShortcuts.ts` | Global keyboard shortcut registration. |
 | `src/lib/withHistory.ts` | History wrapper for timeline-changing actions. |
+| `src/lib/historyActions.ts` | Undo/redo/jump helpers that mark the project dirty only after a snapshot is restored. |
+| `src/lib/historyActions.test.ts` | Vitest coverage for undo/redo/jump dirty policy. |
 
 ---
 
@@ -147,10 +154,14 @@
 | `src-tauri/src/commands/mod.rs` | Command module exports. |
 | `src-tauri/src/commands/common.rs` | Shared `AppError`, event constants, helper types. |
 | `src-tauri/src/commands/asset.rs` | Asset import, ffprobe metadata, thumbnail generation. |
-| `src-tauri/src/commands/ffmpeg.rs` | FFmpeg export command and progress events. |
+| `src-tauri/src/commands/ffmpeg.rs` | FFmpeg export command, filter graph assembly, progress events, thumbnail command. |
+| `src-tauri/src/commands/ffmpeg/probe.rs` | FFmpeg export-time ffprobe helpers, including base clip audio stream detection. |
+| `src-tauri/src/commands/ffmpeg/types.rs` | FFmpeg export payload and internal export plan types. |
+| `src-tauri/src/commands/ffmpeg/tests.rs` | FFmpeg export filter graph unit tests. |
+| `src-tauri/src/commands/ffmpeg/validation.rs` | FFmpeg export plan validation helpers. |
 | `src-tauri/src/commands/project.rs` | Project file save/load commands. |
 | `src-tauri/Cargo.toml` | Rust dependencies and Tauri build config. |
-| `src-tauri/build.rs` | Tauri build script. |
+| `src-tauri/build.rs` | Tauri build script and allowlisted Rust build-time `.env` injection. |
 | `src-tauri/tauri.conf.json` | Tauri app config, window, bundle, sidecar config. |
 | `src-tauri/capabilities/default.json` | Tauri permission/capability rules. |
 | `src-tauri/gen/schemas/*` | Generated Tauri schemas. Do not use as structure source. |
@@ -164,6 +175,8 @@
 |---|---|
 | `scripts/vscode-vite-dev.mjs` | Idempotent Vite dev server helper for VS Code/Tauri debug. |
 | `scripts/download-ffmpeg.mjs` | FFmpeg/ffprobe sidecar downloader. |
+| `scripts/verify-cargo-target.mjs` | Checks Cargo target placement and AppleDouble metadata risks for external-volume development. |
+| `scripts/verify-ffmpeg-sidecars.mjs` | FFmpeg/ffprobe sidecar filename, executable-bit, version, and Tauri bundle config verifier. |
 | `scripts/setup-windows.mjs` | Windows setup helper. |
 | `scripts/app-icon.svg` | Source SVG for app icon generation. |
 | `.github/workflows/release.yml` | Release workflow. |

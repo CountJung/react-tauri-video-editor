@@ -1,5 +1,6 @@
 import { type ToolType, useToolStore } from '@/store/toolStore'
 import ArticleIcon from '@mui/icons-material/Article'
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined'
 import ContentCutIcon from '@mui/icons-material/ContentCut'
 import CropIcon from '@mui/icons-material/Crop'
@@ -64,6 +65,8 @@ function ToolButton({ label, icon, active, onClick }: ToolButtonProps) {
 export function ToolPanel() {
   const activeTool = useToolStore((s) => s.activeTool)
   const setActiveTool = useToolStore((s) => s.setActiveTool)
+  const magicInsertEnabled = useToolStore((s) => s.magicInsertEnabled)
+  const setMagicInsertEnabled = useToolStore((s) => s.setMagicInsertEnabled)
 
   const primaryTools: Array<{ tool: ToolType; label: string; icon: React.ReactNode }> = [
     { tool: 'select', label: '선택 (V)', icon: <MouseIcon fontSize="small" /> },
@@ -133,6 +136,38 @@ export function ToolPanel() {
           onClick={() => setActiveTool(t.tool)}
         />
       ))}
+
+      <Divider flexItem sx={{ my: 0.5, mx: 1 }} />
+
+      <Tooltip
+        title={magicInsertEnabled ? 'Magic Wand 삽입 모드' : 'Overlay 드롭 모드'}
+        placement="right"
+        arrow
+      >
+        <Box
+          component="button"
+          onClick={() => setMagicInsertEnabled(!magicInsertEnabled)}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 40,
+            height: 40,
+            borderRadius: 1,
+            border: 'none',
+            cursor: 'pointer',
+            bgcolor: magicInsertEnabled ? 'warning.main' : 'transparent',
+            color: magicInsertEnabled ? 'warning.contrastText' : 'text.secondary',
+            transition: 'background-color 0.15s, color 0.15s',
+            '&:hover': {
+              bgcolor: magicInsertEnabled ? 'warning.dark' : 'action.hover',
+              color: magicInsertEnabled ? 'warning.contrastText' : 'text.primary',
+            },
+          }}
+        >
+          <AutoFixHighIcon fontSize="small" />
+        </Box>
+      </Tooltip>
     </Box>
   )
 }

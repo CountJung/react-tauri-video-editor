@@ -6,6 +6,7 @@
   "scripts": {
     "setup:windows": "node scripts/setup-windows.mjs",
     "install-ffmpeg": "node scripts/download-ffmpeg.mjs",
+    "install-ffmpeg:all": "node scripts/download-ffmpeg.mjs --all",
     "dev": "tauri dev",
     "dev:vite": "vite",
     "build": "tauri build",
@@ -14,6 +15,9 @@
     "test": "vitest",
     "fix": "biome check --write src/",
     "lint": "biome check src/",
+    "verify:cargo-target": "node scripts/verify-cargo-target.mjs",
+    "verify:ffmpeg-sidecars": "node scripts/verify-ffmpeg-sidecars.mjs",
+    "verify:ffmpeg-sidecars:all": "node scripts/verify-ffmpeg-sidecars.mjs --all",
     "typecheck": "tsc --noEmit",
     "dev:vite:debug": "node scripts/vscode-vite-dev.mjs",
     "dev:vite:vscode": "pnpm dev:vite:debug"

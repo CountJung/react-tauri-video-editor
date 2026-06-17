@@ -23,8 +23,9 @@ interface HistoryState {
 interface HistoryActions {
   /** 현재 timelineStore 상태를 스냅샷으로 저장. 액션 실행 전에 호출한다. */
   pushSnapshot: (label: string) => void
-  undo: () => void
-  redo: () => void
+  undo: () => boolean
+  redo: () => boolean
+  jumpToUndoIndex: (index: number) => boolean
   clearHistory: () => void
 }
 
@@ -74,7 +75,7 @@ export const useHistoryStore = create<HistoryState & HistoryActions>((set, get) 
 
   undo: () => {
     const { undoStack, redoStack } = get()
-    if (undoStack.length === 0) return
+    if (undoStack.length === 0) return false
 
     const [snapshot, ...rest] = undoStack
     // 현재 상태를 redo 스택에 저장
@@ -84,11 +85,12 @@ export const useHistoryStore = create<HistoryState & HistoryActions>((set, get) 
       redoStack: [current, ...redoStack].slice(0, MAX_HISTORY),
     })
     restoreSnapshot(snapshot)
+    return true
   },
 
   redo: () => {
     const { undoStack, redoStack } = get()
-    if (redoStack.length === 0) return
+    if (redoStack.length === 0) return false
 
     const [snapshot, ...rest] = redoStack
     // 현재 상태를 undo 스택에 저장
@@ -98,6 +100,28 @@ export const useHistoryStore = create<HistoryState & HistoryActions>((set, get) 
       redoStack: rest,
     })
     restoreSnapshot(snapshot)
+    return true
+  },
+
+  jumpToUndoIndex: (index) => {
+    const { undoStack, redoStack } = get()
+    if (index < 0 || index >= undoStack.length) return false
+
+    const snapshot = undoStack[index]
+    const current = snapshotTimeline(snapshot.label)
+    set({
+      undoStack: undoStack.slice(index + 1),
+      redoStack: [
+        ...undoStack
+          .slice(0, index)
+          .reverse()
+          .map((item) => ({ ...item })),
+        current,
+        ...redoStack,
+      ].slice(0, MAX_HISTORY),
+    })
+    restoreSnapshot(snapshot)
+    return true
   },
 
   clearHistory: () => set({ undoStack: [], redoStack: [] }),

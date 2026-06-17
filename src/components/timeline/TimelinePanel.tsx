@@ -1,8 +1,8 @@
 import { withHistory } from '@/lib/withHistory'
 import { useAssetStore } from '@/store/assetStore'
-import { useHistoryStore } from '@/store/historyStore'
 import type { Clip, Track } from '@/store/timelineStore'
 import { useTimelineStore } from '@/store/timelineStore'
+import { useToolStore } from '@/store/toolStore'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import AddIcon from '@mui/icons-material/Add'
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
@@ -89,8 +89,7 @@ function TrimHandle({ side, clip, zoom, disabled }: TrimHandleProps) {
       const startTrimEnd = clip.trimEnd
       const label = side === 'start' ? '클립 앞부분 트림' : '클립 뒷부분 트림'
 
-      // 트림 시작 전 스냅샷 저장
-      useHistoryStore.getState().pushSnapshot(label)
+      withHistory(label, () => undefined)
 
       document.body.style.cursor = 'ew-resize'
       document.body.style.userSelect = 'none'
@@ -98,9 +97,9 @@ function TrimHandle({ side, clip, zoom, disabled }: TrimHandleProps) {
       function onMouseMove(ev: MouseEvent) {
         const delta = (ev.clientX - startX) / zoom
         if (side === 'start') {
-          trimClipStart(clip.id, startTrimStart + delta)
+          trimClipStart(clip.id, startTrimStart + delta * (clip.playbackRate ?? 1))
         } else {
-          trimClipEnd(clip.id, startTrimEnd + delta)
+          trimClipEnd(clip.id, startTrimEnd + delta * (clip.playbackRate ?? 1))
         }
       }
 
@@ -146,6 +145,9 @@ interface ClipItemProps {
 
 function ClipItem({ clip, trackType, zoom, locked }: ClipItemProps) {
   const assetName = useAssetStore((s) => s.assets.find((a) => a.id === clip.assetId)?.name ?? '')
+  const activeTool = useToolStore((s) => s.activeTool)
+  const currentTime = useTimelineStore((s) => s.currentTime)
+  const splitClip = useTimelineStore((s) => s.splitClip)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: clip.id,
     data: { type: 'clip', clipId: clip.id, clipName: assetName, originalStart: clip.start },
@@ -156,12 +158,24 @@ function ClipItem({ clip, trackType, zoom, locked }: ClipItemProps) {
     trackType === 'video' ? 'primary.dark' : trackType === 'overlay' ? '#6a1b9a' : 'success.dark'
   const borderColor =
     trackType === 'video' ? 'primary.main' : trackType === 'overlay' ? '#ab47bc' : 'success.main'
+  const canSplit =
+    activeTool === 'razor' &&
+    !locked &&
+    currentTime > clip.start &&
+    currentTime < clip.start + clip.duration
+
+  const handleClick = (event: React.MouseEvent) => {
+    if (!canSplit) return
+    event.stopPropagation()
+    withHistory('클립 분할', () => splitClip(clip.id, currentTime))
+  }
 
   return (
     <Box
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      onClick={handleClick}
       sx={{
         position: 'absolute',
         left: clip.start * zoom,
@@ -176,7 +190,7 @@ function ClipItem({ clip, trackType, zoom, locked }: ClipItemProps) {
         alignItems: 'center',
         px: 0.75,
         overflow: 'hidden',
-        cursor: locked ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
+        cursor: locked ? 'not-allowed' : canSplit ? 'crosshair' : isDragging ? 'grabbing' : 'grab',
         opacity: locked ? 0.62 : isDragging ? 0.45 : 1,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         userSelect: 'none',

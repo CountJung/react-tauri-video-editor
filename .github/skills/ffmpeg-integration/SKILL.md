@@ -10,6 +10,8 @@ description: FFmpeg sidecar 실행, 영상 Export, 썸네일 생성, 진행률 �
 - 모든 FFmpeg 실행은 `src-tauri/src/commands/ffmpeg.rs`에서 관리.
 - 진행률은 `ffmpeg-progress` 이벤트로 프론트에 실시간 전달.
 - 장시간 작업은 blocking 금지 — 비동기 spawn + 이벤트 스트림.
+- Sidecar 배포 검증은 `pnpm verify:ffmpeg-sidecars`로 현재 호스트의 파일명과 `-version` 실행을 확인한다. 릴리즈 전 전체 대상 파일 배치 검증은 `pnpm install-ffmpeg:all` 후 `pnpm verify:ffmpeg-sidecars:all`을 사용한다.
+- ffbinaries 6.1은 native macOS arm64 빌드를 제공하지 않으므로 `aarch64-apple-darwin` sidecar 파일명에는 `osx-64` 호환 바이너리를 배치한다. Apple Silicon 릴리즈 CI에서 `pnpm verify:ffmpeg-sidecars`로 실제 실행 가능성을 확인해야 한다.
 
 ---
 
@@ -65,14 +67,32 @@ ffmpeg -f concat -safe 0 -i concat_list.txt -c copy output.mp4
 
 ## Rust 구현 (`src-tauri/src/commands/ffmpeg.rs`)
 
+- `ffmpeg.rs`: Tauri command, FFmpeg sidecar 실행, filter graph assembly, 진행률 파싱.
+- `ffmpeg/probe.rs`: export 직전 ffprobe 기반 base clip audio stream 감지.
+- `ffmpeg/types.rs`: payload DTO와 내부 export plan 타입.
+- `ffmpeg/tests.rs`: filter graph 문자열 계약 테스트.
+- `ffmpeg/validation.rs`: export plan validation helper.
+- `src/components/preview/exportPayload.ts`: ExportDialog payload builder와 출력 해상도/FPS 스케일링 helper.
+- `src/components/preview/exportPayload.test.ts`: 대표 프로젝트 fixture로 Canvas Preview 활성 레이어 모델과 Export payload 모델의 레이어 순서/좌표/스타일 스케일 일치성을 검증.
+
 ### Export 요청 타입
 
 ```rust
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportTimelinePayload {
+    pub project_meta: ExportProjectMeta,
+    pub tracks: Vec<ExportTrack>,
+    pub assets: Vec<ExportAsset>,
+}
+
 #[derive(serde::Deserialize)]
 pub struct ClipExportInfo {
     pub asset_path: String,
     pub trim_start: f64,
     pub trim_end: f64,
+    pub timeline_start: Option<f64>,
+    pub timeline_duration: Option<f64>,
     // Phase 5 Canvas fit/crop metadata. Frontend sends these from ExportDialog.
     pub fit_mode: Option<String>, // fit | fill | stretch | center | crop
     pub crop_x: Option<f64>,
@@ -90,6 +110,15 @@ pub struct FfmpegProgress {
     pub total_time: f32,
 }
 ```
+
+`ffmpeg_export`는 현재 `payload: ExportTimelinePayload`를 우선 사용해 `projectMeta + tracks + assets` 전체 모델을 받는다. 레거시 호환을 위해 `clips: Option<Vec<ClipExportInfo>>`도 남겨 두되, 프론트엔드는 `tauriInvoke('ffmpeg_export', { outputPath, payload })` 형태로 호출한다.
+ExportDialog는 출력 width/height/FPS 옵션을 제공하고, 선택한 값으로 `projectMeta.canvasWidth/canvasHeight/fps`를 override한다. 출력 해상도가 현재 캔버스와 다르면 프론트엔드에서 payload tracks의 clip bounds, text font/shadow/outline, shape stroke/corner radius를 비율에 맞게 스케일링한 뒤 Rust로 전달한다.
+payload 기반 Export는 비디오 트랙 클립을 `start` 순으로 정렬하고, 클립 사이의 빈 구간은 `color=black` + `anullsrc` 세그먼트로 filter graph에 삽입한다. 겹침은 현재 timeline store의 충돌 방지 결과를 전제로 하며, Export 쪽에서는 시작 시간이 이전 세그먼트보다 빠른 클립을 추가 겹침 없이 순차 concat한다.
+`visible=false` 트랙은 export plan 생성 단계에서 제외한다. 이 정책은 video/overlay/text/shape 트랙 모두에 동일하게 적용한다.
+overlay 트랙의 이미지/비디오 클립은 base concat 결과 `[basev]` 위에 `overlay` 필터로 합성한다. 입력 순서는 base 비디오 클립 이후 overlay 클립이며, 이미지 overlay는 `-loop 1 -t {duration}`, 비디오 overlay는 `-ss {trimStart} -t {timelineDuration}`로 입력한다. 각 overlay는 `fitMode`/`cropRect`/bounds를 적용한 뒤 `format=rgba,colorchannelmixer=aa={opacity}`로 투명도를 반영하고, `enable='between(t,{start},{end})'`로 타임라인 구간에만 표시한다.
+text 트랙은 별도 입력 없이 `drawtext` 필터를 base/overlay 결과 위에 burn-in한다. `textProps.text/fontFamily/fontSize/color/align/outline/shadow`와 clip bounds, track/clip opacity를 `drawtext=text=...:font=...:fontsize=...:fontcolor=...:alpha=...:x=...:y=...:enable=...`로 변환한다. overlay와 text는 `zIndex`/`start` 순으로 하나의 visual layer 체인에 적용해야 프리뷰 레이어 순서와 맞는다. `drawtext` 문자열은 filtergraph 특수문자(`:`, `,`, `'`, `%`, `[]`, `;`, `\`)를 escape한다.
+shape 트랙은 `shapeProps.shapeType`에 따라 export한다. `rect`는 `drawbox` fill/stroke 체인으로 burn-in하고, `circle`/`arrow`는 투명 RGBA `color` source에 `geq` alpha mask를 만든 뒤 `overlay`한다. shape도 overlay/text와 같은 visual layer 체인에서 `zIndex`/`start` 순으로 적용한다. `cornerRadius`와 dash 스타일은 현재 export에서 사각형/실선으로 근사하며, 고정밀 rounded/dashed export가 필요하면 별도 TODO로 분리한다.
+audio 트랙은 clip별 `-ss/-t -i` 입력을 추가하고, `asetpts=PTS-STARTPTS,adelay={startMs}:all=1,volume={gain}` 후 `amix=inputs=N:duration=first:normalize=0`으로 base audio와 믹싱한다. base video clip은 export 직전 ffprobe로 audio stream 여부를 감지해, stream이 있으면 `[input:a]asetpts=...`를 사용하고 없으면 같은 길이의 `anullsrc=channel_layout=stereo:sample_rate=48000`을 생성한다. 이 fallback 덕분에 오디오 없는 비디오/이미지성 입력도 export graph가 깨지지 않는다.
 
 ### Canvas fitMode Export 필터
 
@@ -262,7 +291,8 @@ export function useExport() {
       unlistenDone()
     })
 
-    await tauriInvoke('ffmpeg_export', { outputPath, clips })
+    const payload = { projectMeta, tracks, assets }
+    await tauriInvoke('ffmpeg_export', { outputPath, payload })
   }
 
   return { startExport, progress, isExporting }
