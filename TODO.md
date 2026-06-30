@@ -354,6 +354,25 @@
 
 ---
 
+## Phase 11 — Feature-Sliced Design(FSD) 구조화 백로그
+
+> 목표: 현재 `components/store/lib/routes` 중심 구조를 비디오 편집 도메인에 맞는 FSD 레이어로 점진 정리한다. 기능 변경과 구조 이동을 섞지 않고 작은 커밋 단위로 진행한다.
+
+- [ ] **FSD 기본 레이어 생성** — `src/app`, `src/pages`, `src/widgets`, `src/features`, `src/entities`, `src/shared` 구조를 준비
+- [ ] **shared 레이어 1차 이동** — 범용 Tauri IPC/error/storage/helper/UI를 `src/shared/{api,lib,ui,config}`로 이동
+  - 1차 후보: `src/lib/invoke.ts`, `src/lib/errors.ts`, `src/lib/storageKeys.ts`, `src/components/common/*`
+- [ ] **entities 레이어 분리** — 도메인 명사 기준으로 `project`, `asset`, `timeline`, `track`, `clip`, `settings` slice 생성
+  - 1차 후보: `src/store/projectStore.ts`, `src/store/assetStore.ts`, `src/store/timelineStore.ts`, `src/store/settingsStore.ts`, timeline/asset/project 타입
+- [ ] **features 레이어 분리** — 사용자 행동 기준으로 `import-media`, `create-project`, `save-project`, `load-project`, `edit-timeline`, `trim-clip`, `split-clip`, `move-clip`, `export-video`, `change-settings` 생성
+  - 각 feature는 필요한 `entities`와 `shared`만 직접 의존한다.
+- [ ] **widgets 레이어 분리** — 화면의 큰 패널을 `editor-layout`, `asset-panel`, `preview-panel`, `timeline-panel`, `properties-panel`, `toolbar-panel`, `settings-panel`로 정리
+  - 현재 `src/components/*`의 패널 컴포넌트를 widgets로 이동하고, 도메인 UI는 entities/features로 내려보낸다.
+- [ ] **pages/routes 얇게 유지** — `src/routes/*`는 TanStack Router 엔트리로 유지하고 실제 페이지 조립은 `src/pages/editor`, `src/pages/settings`에서 담당
+- [ ] **FSD import 경계 검증 추가** — 구조 이동 후 `app → pages → widgets → features → entities → shared` 방향을 ESLint 또는 별도 검증 스크립트로 강제
+- [ ] **AGENTS/PROJECT_MAP 동기화** — FSD 구조가 자리 잡으면 `AGENTS.md`, `PROJECT_MAP.md`, `.github/instructions/*.instructions.md`의 경로 설명을 갱신
+
+---
+
 ## 기술 부채 / 보완 사항
 
 - [x] `asset.rs` — `uuid_v4()` naive 구현 → `uuid` crate로 교체
