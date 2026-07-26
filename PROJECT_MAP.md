@@ -188,6 +188,7 @@
 | Path | Role |
 |---|---|
 | `docs/Guide.md` | User/developer guide for preview behavior, build chunk splitting, layer panel, playback. |
+| `docs/FSD_LARGE_FILE_MIGRATION.md` | FSD 목표 경계와 PreviewPlayer/PropertiesPanel/FFmpeg staged split 순서, 회귀 위험, 검증 명령. |
 | `.github/copilot-instructions.md` | Shared high-level rules for Copilot and Codex. |
 | `.github/instructions/backend.instructions.md` | Rust/Tauri backend path rules. |
 | `.github/instructions/ui.instructions.md` | UI, routes, preview, dialog, state rules. |

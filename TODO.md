@@ -357,10 +357,26 @@
 ## Phase 11 — Feature-Sliced Design(FSD) 구조화 백로그
 
 > 목표: 현재 `components/store/lib/routes` 중심 구조를 비디오 편집 도메인에 맞는 FSD 레이어로 점진 정리한다. 기능 변경과 구조 이동을 섞지 않고 작은 커밋 단위로 진행한다.
+> 실행 순서·추출 경계·회귀 위험·검증 명령은 `docs/FSD_LARGE_FILE_MIGRATION.md`를 기준으로 한다. 빈 레이어 폴더만 만드는 작업이나 큰 파일을 그대로 이동하는 작업은 완료로 세지 않는다.
+
+- [x] **FSD/large-file 구조 리뷰 문서화** — 실제 책임, 단계별 추출 경계, 회귀 위험, 외장 볼륨 Rust 검증 명령 확정
+- [ ] **리팩터링 기준선 테스트 보강** — 동작 변경/파일 이동 전에 characterization test를 별도 변경으로 추가
+  - [ ] Preview geometry/media seek policy/playback stop/pointer history 계약
+  - [ ] Properties tool routing/canvas clamp/nested props merge/crop editing 계약
+  - [ ] FFmpeg progress edge case/input index/filter label/escape/silent audio 계약
+- [ ] **PropertiesPanel 단계 분리** — 공통 control → 도구별 panel → tabs/header shell 순서, history label과 store ownership 유지
+- [ ] **ffmpeg.rs 단계 분리** — progress/fit → visual filters → plan → graph 순서, command signature/event/AppError 계약 유지
+- [ ] **PreviewPlayer 단계 분리** — geometry/sync policy → UI → media lifecycle → RAF → pointer interaction 순서
+  - [ ] video/image cache create-sync-release를 한 hook이 소유하고 source URL 교체/unmount cleanup 검증
+  - [ ] timeline clock RAF와 canvas draw RAF의 취소 책임 및 paused one-shot redraw 검증
+  - [ ] move/resize/rotate/text/shape/crop/razor의 pointer capture와 gesture당 history 1회 검증
+- [ ] **FSD 경계 검사 도입** — 레이어 역방향/deep import를 차단하는 `pnpm verify:fsd-imports` 추가, legacy allowlist에 제거 TODO 요구
+- [ ] **Cargo preflight 보강** — 외장 볼륨 source의 `src-tauri/capabilities/._*`도 검출해 Tauri capability UTF-8 실패를 실행 전에 안내
 
 - [ ] **FSD 기본 레이어 생성** — `src/app`, `src/pages`, `src/widgets`, `src/features`, `src/entities`, `src/shared` 구조를 준비
 - [ ] **shared 레이어 1차 이동** — 범용 Tauri IPC/error/storage/helper/UI를 `src/shared/{api,lib,ui,config}`로 이동
   - 1차 후보: `src/lib/invoke.ts`, `src/lib/errors.ts`, `src/lib/storageKeys.ts`, `src/components/common/*`
+  - `withHistory.ts`, `historyActions.ts`, Asset 모델을 아는 `mediaSource.ts`는 shared로 이동하지 않는다.
 - [ ] **entities 레이어 분리** — 도메인 명사 기준으로 `project`, `asset`, `timeline`, `track`, `clip`, `settings` slice 생성
   - 1차 후보: `src/store/projectStore.ts`, `src/store/assetStore.ts`, `src/store/timelineStore.ts`, `src/store/settingsStore.ts`, timeline/asset/project 타입
 - [ ] **features 레이어 분리** — 사용자 행동 기준으로 `import-media`, `create-project`, `save-project`, `load-project`, `edit-timeline`, `trim-clip`, `split-clip`, `move-clip`, `export-video`, `change-settings` 생성
@@ -368,7 +384,7 @@
 - [ ] **widgets 레이어 분리** — 화면의 큰 패널을 `editor-layout`, `asset-panel`, `preview-panel`, `timeline-panel`, `properties-panel`, `toolbar-panel`, `settings-panel`로 정리
   - 현재 `src/components/*`의 패널 컴포넌트를 widgets로 이동하고, 도메인 UI는 entities/features로 내려보낸다.
 - [ ] **pages/routes 얇게 유지** — `src/routes/*`는 TanStack Router 엔트리로 유지하고 실제 페이지 조립은 `src/pages/editor`, `src/pages/settings`에서 담당
-- [ ] **FSD import 경계 검증 추가** — 구조 이동 후 `app → pages → widgets → features → entities → shared` 방향을 ESLint 또는 별도 검증 스크립트로 강제
+- [ ] **FSD import 경계 CI 연결** — 선행 `verify:fsd-imports`를 build/CI gate에 연결하고 임시 legacy allowlist를 제거
 - [ ] **AGENTS/PROJECT_MAP 동기화** — FSD 구조가 자리 잡으면 `AGENTS.md`, `PROJECT_MAP.md`, `.github/instructions/*.instructions.md`의 경로 설명을 갱신
 
 ---
