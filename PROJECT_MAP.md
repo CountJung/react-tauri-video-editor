@@ -246,3 +246,12 @@ When changing structure, check these before finishing:
 - Did a store or state owner change? Update "Stores" and relevant domain skill.
 - Did build chunk strategy change? Update "Where To Go First", `docs/Guide.md`, and project-structure-review-agent skill.
 - Did this file become stale while working? Patch it in the same change before final response.
+## 관련 운영 문서
+
+- [`MASTER_PLAN.html`](MASTER_PLAN.html): 사람용 단계 계획
+- [`AGENTS.md`](AGENTS.md): 에이전트 규칙과 변경 경계
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): 계층·상태 소유권·데이터 흐름
+- [`HARNESS_MAP.md`](HARNESS_MAP.md): 빌드·테스트·검증 절차
+- [`tasks/TASK_TEMPLATE.md`](tasks/TASK_TEMPLATE.md): 작업 카드 템플릿
+
+이 지도는 정적 프로젝트 진입점의 원본이다. 최신 심볼 참조가 필요한 교차 모듈 변경에는 Serena를, 실제 호출 그래프가 필요한 구조 리팩터링에는 Graphify를 선택적으로 사용한다.

@@ -196,3 +196,14 @@ GitHub Copilot은 `applyTo`로 자동 적용하고, Codex는 수정 대상 경�
 | Material UI v7 | `/websites/mui_material-ui` |
 | TanStack Router | `/tanstack/router` |
 | React Flow, Zustand, dnd-kit, WaveSurfer.js, Vite | `resolve-library-id`로 먼저 조회 |
+## 운영 문서 스택
+
+작업 전 변경 성격에 맞춰 다음 루트 문서를 함께 확인한다.
+
+- [`MASTER_PLAN.html`](MASTER_PLAN.html): 사람용 단계 계획과 품질 게이트
+- [`PROJECT_MAP.md`](PROJECT_MAP.md): 파일·진입점·작업별 시작 위치
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): React/Zustand/Tauri/Rust/FFmpeg 경계와 데이터 흐름
+- [`HARNESS_MAP.md`](HARNESS_MAP.md): 변경 유형별 검증 명령
+- [`tasks/TASK_TEMPLATE.md`](tasks/TASK_TEMPLATE.md): 작업 범위·완료 조건·검증 기록 템플릿
+
+문서로 진입점과 경계를 확인할 수 있는 일상 작업에는 Serena나 Graphify를 의무화하지 않는다. 다중 모듈 심볼·IPC·store 계약의 실제 참조 추적이 필요할 때만 Serena를 사용하고, 공용 helper 승격이나 깊은 호출 계층 리팩터링처럼 호출 그래프가 필요한 경우에만 Graphify를 사용한다. 구조·명령·경계가 바뀌면 관련 운영 문서도 같은 변경에서 갱신한다.

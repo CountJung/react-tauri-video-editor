@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Editor 운영 마스터 플랜</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#141b31; --line:#2b3659; --text:#edf2ff; --muted:#a9b4d0; --accent:#75a7ff; --ok:#4ade80; --todo:#fbbf24; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:linear-gradient(135deg,#080d19,#111936); color:var(--text); line-height:1.6; }
+    a { color:var(--accent); }
+    header, main, footer { width:min(1120px, calc(100% - 32px)); margin:auto; }
+    header { padding:56px 0 28px; }
+    h1 { margin:0 0 8px; font-size:clamp(2rem,5vw,3.8rem); line-height:1.1; }
+    h2 { margin-top:0; }
+    .lede,.muted { color:var(--muted); }
+    nav { display:flex; flex-wrap:wrap; gap:10px; margin:24px 0; }
+    nav a,.pill { border:1px solid var(--line); border-radius:999px; padding:7px 12px; text-decoration:none; background:#10172b; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+    section,.card { background:color-mix(in srgb,var(--panel) 94%,transparent); border:1px solid var(--line); border-radius:16px; padding:22px; margin-bottom:18px; box-shadow:0 12px 36px #0004; }
+    table { width:100%; border-collapse:collapse; display:block; overflow-x:auto; }
+    th,td { border-bottom:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top; }
+    th { color:#cbd8ff; }
+    code { background:#090e1c; border:1px solid #26304e; border-radius:5px; padding:1px 5px; }
+    pre { white-space:pre-wrap; background:#090e1c; border:1px solid #26304e; border-radius:10px; padding:14px; overflow:auto; }
+    .ok { color:var(--ok); font-weight:700; } .todo { color:var(--todo); font-weight:700; }
+    ul { padding-left:20px; }
+    footer { color:var(--muted); padding:18px 0 48px; }
+    @media print { body{background:#fff;color:#111} section,.card{box-shadow:none;background:#fff} a{color:#174ea6} }
+  </style>
+</head>
+<body>
+<header>
+  <span class="pill">React 19 · Tauri 2 · FFmpeg</span>
+  <h1>Video Editor<br>운영 마스터 플랜</h1>
+  <p class="lede">사람이 빠르게 현재 상태, 다음 단계, 작업 규칙과 검증 경로를 찾기 위한 standalone 문서 허브입니다. 외부 CDN·폰트·스크립트를 사용하지 않습니다.</p>
+  <nav aria-label="문서 내 탐색">
+    <a href="#status">현재 상태</a><a href="#plan">실행 계획</a><a href="#docs">운영 문서</a><a href="#quality">품질 게이트</a><a href="#risks">위험</a>
+  </nav>
+</header>
+<main>
+  <section id="status">
+    <h2>현재 상태</h2>
+    <p>실제 <code>TODO.md</code>와 코드 구조 기준입니다. 제품 기능 Phase 1~10은 체크 완료되어 있고, 현재 열린 큰 작업은 Phase 11의 점진적 FSD/대형 파일 분리입니다.</p>
+    <table>
+      <thead><tr><th>영역</th><th>상태</th><th>근거/다음 확인</th></tr></thead>
+      <tbody>
+        <tr><td>에셋 임포트·probe·thumbnail</td><td class="ok">구현됨</td><td><code>AssetPanel.tsx</code>, Rust <code>asset.rs</code>/<code>ffmpeg.rs</code></td></tr>
+        <tr><td>Timeline/trim/layer/undo</td><td class="ok">구현됨</td><td><code>TimelinePanel.tsx</code>, timeline/history stores</td></tr>
+        <tr><td>Canvas preview/tools/keyframe</td><td class="ok">구현됨</td><td><code>PreviewPlayer.tsx</code>, compositor, properties/tool panels</td></tr>
+        <tr><td>프로젝트 .vedproj 저장/불러오기</td><td class="ok">구현됨</td><td><code>projectSerialization.ts</code>, <code>project.rs</code></td></tr>
+        <tr><td>FFmpeg 합성 export</td><td class="ok">구현됨</td><td>payload tests + Rust filter graph tests; 실제 sidecar smoke는 환경 필요</td></tr>
+        <tr><td>FSD/대형 파일 분리</td><td class="todo">백로그</td><td><code>TODO.md</code> Phase 11, <code>docs/FSD_LARGE_FILE_MIGRATION.md</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="plan">
+    <h2>실행 계획</h2>
+    <div class="grid">
+      <article class="card"><h3>1. 기준선 고정</h3><p>Preview geometry/seek/pointer history, Properties routing/merge/clamp, FFmpeg input/filter/progress edge case를 characterization test로 먼저 고정합니다.</p><p class="todo">다음 우선순위</p></article>
+      <article class="card"><h3>2. 책임별 분리</h3><p>기능 변경과 이동을 섞지 않고 PropertiesPanel → ffmpeg.rs → PreviewPlayer 순으로 작은 추출을 수행합니다. 각 단계에서 state owner와 IPC/event 계약을 유지합니다.</p></article>
+      <article class="card"><h3>3. FSD 경계 도입</h3><p>shared/entities/features/widgets/pages를 빈 폴더로 먼저 만들지 않습니다. 실제 책임을 이동한 뒤 import verifier와 임시 allowlist 제거를 CI gate로 연결합니다.</p></article>
+      <article class="card"><h3>4. 배포 신뢰성</h3><p>플랫폼별 sidecar 검증, Tauri bundle smoke, macOS 외장 볼륨 Cargo target preflight를 유지·보강합니다.</p></article>
+    </div>
+    <h3>완료 정의</h3>
+    <ul><li>작업 수용 기준과 회귀 테스트가 통과한다.</li><li>프리뷰와 export가 같은 timeline 의미를 유지한다.</li><li>구조/상태/command 변경이 운영 문서에 반영된다.</li><li>실행하지 못한 native 검증은 이유와 함께 명시한다.</li></ul>
+  </section>
+
+  <section id="docs">
+    <h2>운영 문서 링크</h2>
+    <div class="grid">
+      <article class="card"><h3><a href="AGENTS.md">AGENTS.md</a></h3><p>작업 전 확인, 코드 경계, 생성물 금지, 완료 보고 규칙.</p></article>
+      <article class="card"><h3><a href="PROJECT_MAP.md">PROJECT_MAP.md</a></h3><p>실제 진입점, 디렉터리, command와 task별 첫 파일.</p></article>
+      <article class="card"><h3><a href="ARCHITECTURE.md">ARCHITECTURE.md</a></h3><p>계층, 데이터 흐름, 상태 소유권과 변경 계약.</p></article>
+      <article class="card"><h3><a href="HARNESS_MAP.md">HARNESS_MAP.md</a></h3><p>frontend/Rust/sidecar/build 검증 명령과 외장 볼륨 규칙.</p></article>
+      <article class="card"><h3><a href="tasks/TASK_TEMPLATE.md">tasks/TASK_TEMPLATE.md</a></h3><p>기준선, 수용 기준, 계약 영향, 검증 결과를 남기는 템플릿.</p></article>
+      <article class="card"><h3><a href="TODO.md">TODO.md</a></h3><p>완료 이력과 현재 Phase 11 상세 백로그.</p></article>
+    </div>
+    <p class="muted">기존 <a href="MasterPlan.md">MasterPlan.md</a>는 역사적 제품 계획으로 보존합니다. 현재 운영 허브는 이 HTML이며 추가 <code>MASTER_PLAN.md</code>를 만들지 않습니다.</p>
+  </section>
+
+  <section id="quality">
+    <h2>품질 게이트</h2>
+    <pre><code>pnpm lint
+pnpm typecheck
+pnpm test -- --run
+pnpm build:vite
+
+export CARGO_TARGET_DIR="$HOME/.cache/react-tauri-video-editor-target"
+pnpm verify:cargo-target
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings</code></pre>
+    <p>저장소가 <code>/Volumes/...</code>에 있으므로 Cargo output은 내부 디스크에 둡니다. FFmpeg 변경은 다운로드 후 <code>pnpm verify:ffmpeg-sidecars</code>와 실제 짧은 export smoke를 추가합니다.</p>
+  </section>
+
+  <section id="risks">
+    <h2>핵심 위험과 방어선</h2>
+    <table><thead><tr><th>위험</th><th>방어선</th></tr></thead><tbody>
+      <tr><td>Preview/export 의미 불일치</td><td>공통 Track/Clip 모델, export payload test, Rust filter graph test</td></tr>
+      <tr><td>연속 gesture history 폭증</td><td>gesture당 snapshot 1회, dirty 정책 회귀 테스트</td></tr>
+      <tr><td>media/RAF/event 누수</td><td>생성 주체가 unlisten/cancel/revoke/cleanup 소유</td></tr>
+      <tr><td>대형 파일 리팩터링 회귀</td><td>characterization test 선행, 책임별 작은 이동</td></tr>
+      <tr><td>외장 볼륨 AppleDouble 오류</td><td>내부 <code>CARGO_TARGET_DIR</code> + preflight verifier</td></tr>
+      <tr><td>플랫폼 sidecar 누락</td><td>downloader/verifier/config/workflow를 한 계약으로 변경</td></tr>
+    </tbody></table>
+  </section>
+</main>
+<footer>이 문서는 저장소 파일만으로 렌더링되는 standalone HTML입니다. 상태 변경 시 TODO 및 관련 운영 문서와 함께 갱신하세요.</footer>
+</body>
+</html>
