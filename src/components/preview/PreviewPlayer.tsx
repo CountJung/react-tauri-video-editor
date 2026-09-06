@@ -363,22 +363,6 @@ export function PreviewPlayer() {
 
     for (const layer of activeLayersRef.current) {
       const { clip, track, asset } = layer
-      if (clip.clipType === 'media' && asset?.type === 'video') {
-        const video = videoCacheRef.current.get(asset.id)
-        if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-          ctx.save()
-          ctx.globalAlpha = Math.max(
-            0,
-            Math.min(
-              1,
-              clip.opacity * track.opacity * getClipFadeOpacity(clip, currentTimeRef.current)
-            )
-          )
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-          ctx.restore()
-        }
-        continue
-      }
 
       withClipTransform(
         ctx,
@@ -387,7 +371,17 @@ export function PreviewPlayer() {
         () => {
           if (clip.clipType === 'text') drawTextClip(ctx, clip)
           else if (clip.clipType === 'shape') drawShapeClip(ctx, clip)
-          else if (asset?.type === 'image') {
+          else if (asset?.type === 'video') {
+            const video = videoCacheRef.current.get(asset.id)
+            if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+              const source = getMediaSourceSize(
+                asset,
+                { width: video.videoWidth, height: video.videoHeight },
+                clip
+              )
+              drawImageLike(ctx, video, source.width, source.height, clip)
+            }
+          } else if (asset?.type === 'image') {
             const img = imageCacheRef.current.get(asset.id)
             if (img?.complete) {
               const source = getMediaSourceSize(
