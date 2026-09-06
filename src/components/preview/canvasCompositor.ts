@@ -48,6 +48,12 @@ export function getClipLocalTime(clip: Clip, timelineTime: number): number {
   return clip.trimStart + (timelineTime - clip.start) * (clip.playbackRate ?? 1)
 }
 
+/** 타임라인 시각을 클립의 trim 구간 안으로 잘라낸 원본 미디어 시각 */
+export function clampClipMediaTime(clip: Clip, timelineTime: number): number {
+  const targetTime = getClipLocalTime(clip, timelineTime)
+  return Math.max(clip.trimStart, Math.min(clip.trimEnd, targetTime))
+}
+
 export function isClipActive(clip: Clip, timelineTime: number): boolean {
   return timelineTime >= clip.start && timelineTime < clip.start + clip.duration
 }
