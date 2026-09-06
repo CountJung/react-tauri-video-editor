@@ -35,9 +35,9 @@ import {
 import {
   type ActiveAudioSource,
   collectActiveAudioSources,
-  getAudioElementKey,
   getAudioElementVolume,
   getAudioSourceGain,
+  getMediaElementKey,
   makeAudioSyncKey,
 } from './previewAudio'
 
@@ -363,22 +363,6 @@ export function PreviewPlayer() {
 
     for (const layer of activeLayersRef.current) {
       const { clip, track, asset } = layer
-      if (clip.clipType === 'media' && asset?.type === 'video') {
-        const video = videoCacheRef.current.get(asset.id)
-        if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-          ctx.save()
-          ctx.globalAlpha = Math.max(
-            0,
-            Math.min(
-              1,
-              clip.opacity * track.opacity * getClipFadeOpacity(clip, currentTimeRef.current)
-            )
-          )
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-          ctx.restore()
-        }
-        continue
-      }
 
       withClipTransform(
         ctx,
@@ -387,7 +371,17 @@ export function PreviewPlayer() {
         () => {
           if (clip.clipType === 'text') drawTextClip(ctx, clip)
           else if (clip.clipType === 'shape') drawShapeClip(ctx, clip)
-          else if (asset?.type === 'image') {
+          else if (asset?.type === 'video') {
+            const video = videoCacheRef.current.get(getMediaElementKey(clip))
+            if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+              const source = getMediaSourceSize(
+                asset,
+                { width: video.videoWidth, height: video.videoHeight },
+                clip
+              )
+              drawImageLike(ctx, video, source.width, source.height, clip)
+            }
+          } else if (asset?.type === 'image') {
             const img = imageCacheRef.current.get(asset.id)
             if (img?.complete) {
               const source = getMediaSourceSize(
@@ -426,13 +420,13 @@ export function PreviewPlayer() {
       options: {
         forceSeek: boolean
         playing: boolean
-        /** embedded 오디오를 들려줘야 하는 에셋 (video 트랙 비디오 클립) */
-        audibleAssetIds: Set<string>
+        /** embedded 오디오를 들려줘야 하는 클립 (video 트랙 비디오 클립) */
+        audibleClipIds: Set<string>
         /** embedded 오디오에 적용할 element volume */
         audioVolume: number
       }
     ) => {
-      const activeVideoAssetIds = new Set<string>()
+      const activeVideoKeys = new Set<string>()
 
       for (const layer of layers) {
         const asset = layer.asset
@@ -454,12 +448,13 @@ export function PreviewPlayer() {
         }
 
         if (asset.type === 'video') {
-          activeVideoAssetIds.add(asset.id)
-          let video = videoCacheRef.current.get(asset.id)
+          const key = getMediaElementKey(layer.clip)
+          activeVideoKeys.add(key)
+          let video = videoCacheRef.current.get(key)
           if (video?.dataset.sourceUrl !== url) {
             if (video) releaseVideoElement(video)
-            videoCacheRef.current.delete(asset.id)
-            videoSyncKeyRef.current.delete(asset.id)
+            videoCacheRef.current.delete(key)
+            videoSyncKeyRef.current.delete(key)
             video = undefined
           }
           if (!video) {
@@ -471,16 +466,16 @@ export function PreviewPlayer() {
             video.onerror = scheduleDrawFrame
             video.dataset.sourceUrl = url
             video.src = url
-            videoCacheRef.current.set(asset.id, video)
+            videoCacheRef.current.set(key, video)
           }
           const targetTime = clampClipMediaTime(layer.clip, timelineTime)
           video.playbackRate = layer.clip.playbackRate ?? 1
           // overlay 트랙 비디오는 Export가 소리를 합성하지 않으므로 프리뷰에서도 음소거한다.
-          const audible = options.audibleAssetIds.has(asset.id)
+          const audible = options.audibleClipIds.has(key)
           video.muted = !audible
           video.volume = audible ? options.audioVolume : 0
           const syncKey = makeVideoSyncKey(layer.clip)
-          const previousSyncKey = videoSyncKeyRef.current.get(asset.id)
+          const previousSyncKey = videoSyncKeyRef.current.get(key)
           const drift = Math.abs(video.currentTime - targetTime)
           const shouldSeek =
             options.forceSeek ||
@@ -490,7 +485,7 @@ export function PreviewPlayer() {
           if (Number.isFinite(targetTime) && shouldSeek) {
             video.currentTime = targetTime
           }
-          videoSyncKeyRef.current.set(asset.id, syncKey)
+          videoSyncKeyRef.current.set(key, syncKey)
 
           if (options.playing) {
             if (video.paused) void video.play().catch(() => {})
@@ -500,8 +495,8 @@ export function PreviewPlayer() {
         }
       }
 
-      for (const [assetId, video] of videoCacheRef.current) {
-        if (!activeVideoAssetIds.has(assetId)) video.pause()
+      for (const [key, video] of videoCacheRef.current) {
+        if (!activeVideoKeys.has(key)) video.pause()
       }
     },
     [scheduleDrawFrame]
@@ -519,7 +514,7 @@ export function PreviewPlayer() {
         // 비디오에 포함된 오디오는 video element가 그대로 재생하므로 여기서 다루지 않는다.
         if (source.kind !== 'audio') continue
 
-        const key = getAudioElementKey(source)
+        const key = getMediaElementKey(source.clip)
         activeKeys.add(key)
         const url = getAssetUrl(source.asset)
 
@@ -574,27 +569,27 @@ export function PreviewPlayer() {
   )
 
   /** video 트랙 비디오 클립의 embedded 오디오만 소리를 낸다 */
-  const audibleAssetIdsRef = useRef<Set<string>>(new Set())
-  const audibleAssetIds = useMemo(
+  const audibleClipIdsRef = useRef<Set<string>>(new Set())
+  const audibleClipIds = useMemo(
     () =>
       new Set(
         activeAudioSources
           .filter((source) => source.kind === 'embedded')
-          .map((source) => source.asset.id)
+          .map((source) => getMediaElementKey(source.clip))
       ),
     [activeAudioSources]
   )
 
   useEffect(() => {
-    audibleAssetIdsRef.current = audibleAssetIds
-  }, [audibleAssetIds])
+    audibleClipIdsRef.current = audibleClipIds
+  }, [audibleClipIds])
 
   useEffect(() => {
     if (isPlaying) return
     syncMediaElements(activeLayers, storeCurrentTime, {
       forceSeek: true,
       playing: false,
-      audibleAssetIds,
+      audibleClipIds,
       audioVolume: getAudioElementVolume(1, masterVolume, isMuted),
     })
     syncAudioElements(activeAudioSources, storeCurrentTime, {
@@ -606,7 +601,7 @@ export function PreviewPlayer() {
   }, [
     activeAudioSources,
     activeLayers,
-    audibleAssetIds,
+    audibleClipIds,
     isMuted,
     isPlaying,
     masterVolume,
@@ -622,7 +617,7 @@ export function PreviewPlayer() {
       syncMediaElements(activeLayersRef.current, currentTimeRef.current, {
         forceSeek: false,
         playing: true,
-        audibleAssetIds: audibleAssetIdsRef.current,
+        audibleClipIds: audibleClipIdsRef.current,
         audioVolume: getAudioElementVolume(1, masterVolumeRef.current, isMutedRef.current),
       })
       syncAudioElements(activeAudioSourcesRef.current, currentTimeRef.current, {
@@ -639,37 +634,40 @@ export function PreviewPlayer() {
     }
   }, [isPlaying, syncAudioElements, syncMediaElements])
 
+  // video/audio element는 clip 소유이므로 클립이 사라지거나 그 에셋이 제거되면 해제한다.
+  // 이미지는 재생 위치가 없어 asset 단위로 공유하므로 에셋 기준으로만 해제한다.
   useEffect(() => {
-    const activeAssetIds = new Set(assets.map((asset) => asset.id))
+    const liveAssetIds = new Set(assets.map((asset) => asset.id))
+    const liveClipKeys = new Set(
+      tracks
+        .flatMap((track) => track.clips)
+        .filter((clip) => !clip.assetId || liveAssetIds.has(clip.assetId))
+        .map((clip) => getMediaElementKey(clip))
+    )
 
-    for (const [assetId, video] of videoCacheRef.current) {
-      if (!activeAssetIds.has(assetId)) {
+    for (const [key, video] of videoCacheRef.current) {
+      if (!liveClipKeys.has(key)) {
         releaseVideoElement(video)
-        videoCacheRef.current.delete(assetId)
-        videoSyncKeyRef.current.delete(assetId)
+        videoCacheRef.current.delete(key)
+        videoSyncKeyRef.current.delete(key)
       }
     }
-
-    for (const [assetId, image] of imageCacheRef.current) {
-      if (!activeAssetIds.has(assetId)) {
-        releaseImageElement(image)
-        imageCacheRef.current.delete(assetId)
-      }
-    }
-  }, [assets])
-
-  // 오디오 element는 clip 소유이므로 클립이 타임라인에서 사라질 때 해제한다.
-  useEffect(() => {
-    const liveClipIds = new Set(tracks.flatMap((track) => track.clips).map((clip) => clip.id))
 
     for (const [key, audio] of audioCacheRef.current) {
-      if (!liveClipIds.has(key)) {
+      if (!liveClipKeys.has(key)) {
         releaseAudioElement(audio)
         audioCacheRef.current.delete(key)
         audioSyncKeyRef.current.delete(key)
       }
     }
-  }, [tracks])
+
+    for (const [assetId, image] of imageCacheRef.current) {
+      if (!liveAssetIds.has(assetId)) {
+        releaseImageElement(image)
+        imageCacheRef.current.delete(assetId)
+      }
+    }
+  }, [assets, tracks])
 
   useEffect(() => {
     if (isPlaying) return

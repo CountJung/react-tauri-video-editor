@@ -394,18 +394,20 @@
 
 ### 프리뷰/Export 불일치 — 남은 작업 (우선순위 순)
 
-- [ ] **[P0] 비디오 렌더 경로 복구** — `PreviewPlayer.tsx`의 비디오 클립이
-  `ctx.drawImage(video, 0, 0, canvas.width, canvas.height)`로 캔버스 전체에 강제 stretch되어
-  `withClipTransform` / `getFitDrawRect`를 통째로 우회한다
-  - 증상 1: 소스와 캔버스 비율이 다르면 프리뷰는 늘어나고 Export는 레터박스(`pad`) → 결과가 다름
-  - 증상 2: overlay 트랙 비디오가 캔버스 전체를 덮어 PIP 프리뷰가 불가능 (Export는 `overlay=x:y`로 정상 배치)
-  - 증상 3: rotation / x·y·w·h / cropRect / 키프레임이 비디오에만 무반영
-  - 선행: 아래 fit/geometry characterization test
-  - 되돌릴 때 `비디오 맞춤 모드 비활성화`로 껐던 PropertiesPanel 맞춤 제어도 함께 복구
-- [ ] **[P1] video element 캐시 키를 clip 단위로 교체** — 현재 `asset.id` 기준이라
-  같은 에셋을 서로 다른 trim 구간의 두 클립으로 배치하고 동시에 활성화하면 하나의 element를 공유해
-  매 RAF마다 `currentTime`/`playbackRate` seek 경합이 발생한다
-  (오디오는 `getAudioElementKey`로 이미 clip 단위)
+- [x] **[P0] 비디오 렌더 경로 복구** — 비디오 클립이 `ctx.drawImage(video, 0, 0, canvas.width, canvas.height)`로
+  캔버스 전체에 강제 stretch되어 `withClipTransform` / `getFitDrawRect`를 통째로 우회하던 문제 수정
+  - 비디오를 이미지와 같은 경로로 통합 (`withClipTransform` + `getMediaSourceSize` + `drawImageLike`)
+  - PropertiesPanel의 `캔버스 전체에 맞춤` 버튼·맞춤 모드 선택 재활성화, 고정 렌더 안내 문구 제거
+  - 선행 characterization test 11개 추가 (`canvasCompositor.test.ts`: 5개 fitMode,
+    drawImageLike 5/9-인자 분기, withClipTransform alpha/rotation/clip, getMediaSourceSize 우선순위)
+  - [ ] **실제 앱 스모크 테스트 미완** — 비율이 다른 소스로 fit/fill/stretch/center/crop,
+    오버레이 PIP, rotation, crop 도구를 육안 확인할 것
+- [x] **[P1] video element 캐시 키를 clip 단위로 교체** — `asset.id` 기준 공유로 인한
+  `currentTime`/`playbackRate` seek 경합 제거. `getMediaElementKey(clip)`을 video/audio가 공용으로 사용.
+  캐시 해제 effect를 하나로 합쳐 클립 제거와 에셋 제거를 함께 처리
+  - 이미지는 재생 위치가 없어 asset 단위 공유 유지
+  - [ ] element 수 상한 없음 — 활성화된 적 있는 클립 수만큼 element가 남는다.
+    긴 타임라인에서 메모리 증가가 확인되면 비활성 클립 eviction 추가
 - [ ] **[P1] Export에 rotation 반영** — Canvas는 `clip.rotation`을 렌더하지만 Rust 쪽에 대응 필터가 없다
 - [ ] **[P1] Export에 playbackRate 반영** — `types.rs`에 `playback_rate` 필드만 있고 filter graph에서 미사용
   (`setpts` / `atempo` 필요)
@@ -414,6 +416,9 @@
   - 위 4개를 당장 구현하지 않을 경우, 최소한 PropertiesPanel에서 **"프리뷰 전용"** 으로 표기할 것
 - [ ] **[P2] `center` fitMode 의미 통일** — Canvas는 원본 크기 유지 후 클리핑,
   ffmpeg은 `scale='min(iw,W)':'min(ih,H)'`로 축소 후 pad → 소스가 캔버스보다 클 때 결과가 갈린다
+- [ ] **[P2] Crop 비율 프리셋 미구현** — PropertiesPanel의 `16:9 / 9:16 / 1:1 / 4:3 / 자유`
+  ToggleButtonGroup에 `onChange`가 없고 전부 `disabled`다. Phase 6의 `프리셋 비율 버튼` 항목은
+  UI만 있고 동작하지 않는다
 - [ ] **[P2] base 클립 배치 규칙 명문화** — Export는 video 트랙 클립의 `x/y/width/height`를 무시하고
   캔버스 전체로 fit한다. 현재는 `normalizeMediaClipBoundsForCanvasResize`가 풀캔버스로 정규화해줘서
   우연히 일치할 뿐이므로, 정규화가 깨지면 조용히 어긋난다

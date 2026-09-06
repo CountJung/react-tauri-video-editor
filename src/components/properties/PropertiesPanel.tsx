@@ -387,7 +387,6 @@ function SelectPanel() {
               size="small"
               variant="outlined"
               fullWidth
-              disabled
               startIcon={<FitScreenIcon sx={{ fontSize: 16 }} />}
               onClick={() => withHistory('클립을 캔버스에 맞춤', () => fitClipToCanvas(clip.id))}
               sx={{ justifyContent: 'flex-start', fontSize: 12 }}
@@ -399,7 +398,6 @@ function SelectPanel() {
             <TextField
               size="small"
               select
-              disabled
               value={clip.fitMode}
               onChange={(e) =>
                 updateSelectedClipCanvas('클립 맞춤 모드 변경', {
@@ -416,12 +414,6 @@ function SelectPanel() {
               <MenuItem value="crop">crop — cropRect 사용</MenuItem>
             </TextField>
           </Row>
-          <Box sx={{ px: 1.5, pb: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              현재 비디오 프리뷰는 검증용으로 전체 캔버스에 고정 렌더되므로 맞춤 모드는 비활성화되어
-              있습니다.
-            </Typography>
-          </Box>
           {fitModesLookSame && (
             <Box sx={{ px: 1.5, pb: 1 }}>
               <Typography variant="caption" color="text.secondary">

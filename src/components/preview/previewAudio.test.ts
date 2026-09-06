@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { clampClipMediaTime } from './canvasCompositor'
 import {
   collectActiveAudioSources,
-  getAudioElementKey,
   getAudioElementVolume,
   getAudioSourceGain,
+  getMediaElementKey,
   makeAudioSyncKey,
 } from './previewAudio'
 
@@ -193,12 +193,12 @@ describe('preview audio gain', () => {
 
 describe('preview audio element identity', () => {
   it('keys elements by clip so one asset can play twice with different trims', () => {
-    const first = { clip: clip({ id: 'clip-a', trimStart: 0, trimEnd: 2 }) }
-    const second = { clip: clip({ id: 'clip-b', trimStart: 5, trimEnd: 7 }) }
+    const first = clip({ id: 'clip-a', trimStart: 0, trimEnd: 2 })
+    const second = clip({ id: 'clip-b', trimStart: 5, trimEnd: 7 })
 
-    expect(getAudioElementKey(first)).toBe('clip-a')
-    expect(getAudioElementKey(second)).toBe('clip-b')
-    expect(getAudioElementKey(first)).not.toBe(getAudioElementKey(second))
+    expect(getMediaElementKey(first)).toBe('clip-a')
+    expect(getMediaElementKey(second)).toBe('clip-b')
+    expect(getMediaElementKey(first)).not.toBe(getMediaElementKey(second))
   })
 
   it('changes the sync key when the clip timing changes', () => {

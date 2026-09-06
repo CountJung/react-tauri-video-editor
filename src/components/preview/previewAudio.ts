@@ -97,13 +97,15 @@ export function getAudioElementVolume(gain: number, masterVolume: number, muted:
 }
 
 /**
- * media element 캐시 키.
+ * 재생 위치를 가지는 media element(video/audio)의 캐시 키.
  *
- * 같은 에셋을 서로 다른 trim 구간의 클립으로 여러 번 배치할 수 있으므로
- * asset이 아니라 clip 단위로 element를 소유한다.
+ * 같은 에셋을 서로 다른 trim 구간의 클립으로 여러 번 배치할 수 있고
+ * 두 클립이 동시에 활성일 수 있으므로, asset이 아니라 clip 단위로
+ * element를 소유해야 currentTime/playbackRate가 서로 덮어쓰지 않는다.
+ * (이미지는 재생 위치가 없으므로 asset 단위 공유로 충분하다.)
  */
-export function getAudioElementKey(source: Pick<ActiveAudioSource, 'clip'>): string {
-  return source.clip.id
+export function getMediaElementKey(clip: Pick<Clip, 'id'>): string {
+  return clip.id
 }
 
 /** 클립의 시간 배치가 바뀌었는지 판정하는 키. 값이 바뀌면 강제 seek 한다. */
