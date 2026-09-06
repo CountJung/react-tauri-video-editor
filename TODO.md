@@ -392,6 +392,30 @@
   오버레이 소리를 살릴지 결정하고 프리뷰·Export를 같이 바꾼다
 - [ ] **재생 시작 지연 확인** — `play()` 호출 시점의 버퍼링으로 첫 프레임 오디오가 늦게 시작하는지 실측
 
+### 프리뷰 canvas backing store (완료)
+
+- [x] **canvas 크기 미적용 근본 원인 수정** — JSX가 `<Box component="canvas" width height>`로
+  크기를 넘겼으나 MUI Box가 width/height를 시스템 스타일 prop으로 흡수해 HTML 속성으로
+  전달하지 않았다. backing store가 기본값 300x150에 머물러 프로젝트 좌표로 그린 레이어가
+  전부 캔버스 밖으로 나갔고, CSS 확대 때문에 화면상으로는 크기가 맞아 보였다
+  - 이것이 "비디오만 canvas 좌표로 전체 렌더"라는 과거 우회가 통해 보였던 이유
+  - effect에서 `canvas.width/height`를 직접 설정하도록 변경
+  - [ ] **텍스트/도형 프리뷰 재확인** — 이 버그 동안 프로젝트 좌표로 그리던 텍스트·도형도
+    화면 밖에 있었을 가능성이 크다. 실제로 보이는지 확인하고 필요하면 E2E 케이스 추가
+
+### E2E 하네스 (완료)
+
+- [x] **Playwright canvas 픽셀 검증 도입** — `pnpm test:e2e`
+  - Tauri 앱 창은 macOS WKWebView에 WebDriver가 없어 자동화 불가. Vite dev 서버(브라우저 모드)에서
+    같은 React/canvas 코드를 검증한다
+  - 스크린샷 diff 대신 `getImageData`로 경계 좌표를 판정 (코덱 색 흔들림·렌더 타이밍에 강함)
+  - fixture는 ffmpeg로 globalSetup에서 생성, 저장소에 바이너리를 넣지 않음
+  - `src/lib/testBridge.ts`(DEV 전용)로 클립 배치만 store 경유. 검증은 실제 렌더 결과
+- [ ] **E2E 확장** — 오디오 재생(muted/volume), 텍스트/도형 렌더, crop 도구, rotation,
+  undo/redo, 캔버스 리사이즈 시 클립 정규화
+- [ ] **dnd-kit 드래그 경로 E2E** — 현재 클립 배치를 store로 건너뛰므로 드래그 자체는 검증되지 않는다
+- [ ] **CI 연결** — GitHub Actions에 `pnpm test:e2e` 추가 (ffmpeg 설치 필요)
+
 ### 프리뷰/Export 불일치 — 남은 작업 (우선순위 순)
 
 - [x] **[P0] 비디오 렌더 경로 복구** — 비디오 클립이 `ctx.drawImage(video, 0, 0, canvas.width, canvas.height)`로
@@ -400,8 +424,10 @@
   - PropertiesPanel의 `캔버스 전체에 맞춤` 버튼·맞춤 모드 선택 재활성화, 고정 렌더 안내 문구 제거
   - 선행 characterization test 11개 추가 (`canvasCompositor.test.ts`: 5개 fitMode,
     drawImageLike 5/9-인자 분기, withClipTransform alpha/rotation/clip, getMediaSourceSize 우선순위)
-  - [ ] **실제 앱 스모크 테스트 미완** — 비율이 다른 소스로 fit/fill/stretch/center/crop,
-    오버레이 PIP, rotation, crop 도구를 육안 확인할 것
+  - [x] **E2E 픽셀 검증으로 대체** — Playwright로 fit 레터박스 경계, stretch/fill,
+    오버레이 PIP, 명시적 클립 사각형, 이미지 경로 동일성을 canvas 픽셀로 검증
+  - [ ] **Tauri 실제 앱 수동 확인** — center/crop 모드, rotation, crop 도구,
+    IPC 경유 에셋(ffprobe W/H)은 E2E 범위 밖이라 앱에서 육안 확인 필요
 - [x] **[P1] video element 캐시 키를 clip 단위로 교체** — `asset.id` 기준 공유로 인한
   `currentTime`/`playbackRate` seek 경합 제거. `getMediaElementKey(clip)`을 video/audio가 공용으로 사용.
   캐시 해제 effect를 하나로 합쳐 클립 제거와 에셋 제거를 함께 처리
