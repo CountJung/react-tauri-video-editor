@@ -4,6 +4,8 @@ export const STORAGE_KEYS = {
   PANEL_ASSET_WIDTH: 'panel:asset:width',
   PANEL_PREVIEW_HEIGHT: 'panel:preview:height',
   PREVIEW_CANVAS_ZOOM: 'preview:canvas:zoom',
+  PREVIEW_VOLUME: 'preview:volume',
+  PREVIEW_MUTED: 'preview:muted',
   PANEL_TIMELINE_HEIGHT: 'panel:timeline:height',
   // 앱 설정
   SETTINGS_THEME_MODE: 'settings:themeMode',

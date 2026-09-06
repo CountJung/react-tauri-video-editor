@@ -3,6 +3,7 @@ import type { Asset, Clip, Track } from '@/store/timelineStore'
 import { describe, expect, it } from 'vitest'
 import { collectActiveLayers } from './canvasCompositor'
 import { buildExportTimelinePayload } from './exportPayload'
+import { collectActiveAudioSources, getAudioSourceGain } from './previewAudio'
 
 function clip(overrides: Partial<Clip> = {}): Clip {
   return {
@@ -236,5 +237,48 @@ describe('preview/export payload consistency', () => {
     })
     expect(payloadShape).toMatchObject({ x: 600, y: 80, width: 120, height: 90 })
     expect(payloadShape?.shapeProps).toMatchObject({ strokeWidth: 3, cornerRadius: 8 })
+  })
+
+  it('selects the same audio sources the export plan would build', () => {
+    const timelineTime = 2
+    const tracks: Track[] = [
+      track({
+        id: 'video-track',
+        type: 'video',
+        clips: [clip({ id: 'base-video', assetId: 'video-1' })],
+      }),
+      track({
+        id: 'overlay-track',
+        type: 'overlay',
+        zIndex: 1,
+        clips: [clip({ id: 'overlay-video', assetId: 'video-1' })],
+      }),
+      track({
+        id: 'audio-track',
+        type: 'audio',
+        zIndex: -1,
+        opacity: 0.8,
+        clips: [clip({ id: 'music', assetId: 'audio-1', opacity: 0.5 })],
+      }),
+      track({
+        id: 'muted-audio-track',
+        type: 'audio',
+        zIndex: -1,
+        visible: false,
+        clips: [clip({ id: 'muted-music', assetId: 'audio-1' })],
+      }),
+    ]
+
+    const sources = collectActiveAudioSources(tracks, assets, timelineTime)
+
+    // Export의 build_plan_from_payload과 같은 선택 결과여야 한다:
+    // video 트랙 비디오의 embedded 오디오 + audio 트랙 클립. overlay/hidden은 제외.
+    expect(sources.map((source) => [source.clip.id, source.kind])).toEqual([
+      ['base-video', 'embedded'],
+      ['music', 'audio'],
+    ])
+
+    // Export의 amix 게인 = clip.opacity * track.opacity, embedded는 감쇠 없음
+    expect(sources.map((source) => getAudioSourceGain(source))).toEqual([1, 0.4])
   })
 })

@@ -302,10 +302,10 @@
   - **Magic Wand 버튼** — ToolPanel 또는 타임라인 툴바에 Magic Wand 토글 버튼 추가
     - 활성화 시 드롭 기본 동작이 insert 모드로 변경
   - **되돌리기 지원** — undo/redo 스택과 연동 필요
-- [x] **재생 속도 조절** — 클립 속성에 `playbackRate` 추가 (0.25×~4×)
-- [x] **페이드 인/아웃** — 클립 시작/끝 불투명도 키프레임 (fade handle)
+- [x] **재생 속도 조절** — 클립 속성에 `playbackRate` 추가 (0.25×~4×) *(프리뷰 전용 — Export 미반영, 아래 2026-09-06 리뷰 참조)*
+- [x] **페이드 인/아웃** — 클립 시작/끝 불투명도 키프레임 (fade handle) *(프리뷰 전용 — Export 미반영, 아래 2026-09-06 리뷰 참조)*
 - [x] **비디오 크롭** — `cropRect`로 보여줄 영역 지정 (클립 내부 뷰포트)
-- [x] **키프레임 애니메이션** — 위치·크기·불투명도에 키프레임 추가 (고급)
+- [x] **키프레임 애니메이션** — 위치·크기·불투명도에 키프레임 추가 (고급) *(프리뷰 전용 — Export 미반영, 아래 2026-09-06 리뷰 참조)*
 
 ---
 
@@ -320,7 +320,10 @@
 - [x] **오디오 믹싱** — 다중 오디오 트랙 `amix` 필터
 - [x] **무음/오디오 없는 소스 Export 대응** — 비디오/이미지 입력에 오디오 스트림이 없을 때 `anullsrc` fallback 또는 무음 export 경로 구현
 - [x] **해상도·프레임레이트 설정** — Export 옵션 UI 추가
-- [x] **프리뷰-Export 일치성 테스트** — 대표 프로젝트 fixture로 Canvas Preview 모델과 Export 결과가 같은지 회귀 검증
+- [ ] **프리뷰-Export 일치성 테스트** — 대표 프로젝트 fixture로 Canvas Preview 모델과 Export 결과가 같은지 회귀 검증
+  - [x] 레이어 선택/스케일링 일치 (`exportPayload.test.ts`)
+  - [x] 오디오 소스 선택/게인 일치 (`exportPayload.test.ts`)
+  - [ ] 비디오 클립 배치(fitMode/x·y·w·h/rotation) 일치 — 프리뷰가 fitMode를 우회 중이라 현재 성립하지 않음
 
 ---
 
@@ -339,8 +342,8 @@
 - [x] **fitMode 동일 비율 안내** — 원본 소스와 클립 프레임 비율이 같아 맞춤 모드 차이가 보이지 않는 경우 속성 패널에서 안내
 - [x] **프리뷰 fit 계산 기준 수정** — 브라우저 videoWidth 불일치보다 ffprobe 에셋 W/H를 우선해 전체 영상 영역이 보이도록 보정
 - [x] **프리뷰 고정 배율 전체 보기 보장** — 100% 같은 표시 배율이 뷰포트보다 크면 자동 축소해 캔버스 일부만 보이는 스크롤 상태 방지
-- [x] **검증용 비디오 전체 캔버스 고정 렌더** — fitMode를 우회하고 비디오 프레임을 `0,0,canvasWidth,canvasHeight`에 직접 그려 표시 확인
-- [x] **비디오 맞춤 모드 비활성화** — 우측 PropertiesPanel의 미디어 맞춤 제어를 비활성화하고 전체 캔버스 고정 렌더 상태를 명시
+- [x] **검증용 비디오 전체 캔버스 고정 렌더** — fitMode를 우회하고 비디오 프레임을 `0,0,canvasWidth,canvasHeight`에 직접 그려 표시 확인 *(디버깅용 임시 우회. 되돌리는 작업은 아래 2026-09-06 리뷰 참조)*
+- [x] **비디오 맞춤 모드 비활성화** — 우측 PropertiesPanel의 미디어 맞춤 제어를 비활성화하고 전체 캔버스 고정 렌더 상태를 명시 *(위 우회에 종속. 되돌리는 작업은 아래 2026-09-06 리뷰 참조)*
 - [x] **Crop 제어 표시 조건화** — Crop 도구의 수치 제어는 `자르기 편집 시작` 버튼을 누른 동안에만 표시·동작
 - [x] **Tauri 보안 범위 축소** — `csp: null`, `assetProtocol.scope: ["**"]`, shell/fs 권한을 필요한 범위로 제한
 - [x] **미디어 캐시/RAF 정리** — 에셋 삭제·프로젝트 로드·언마운트 시 video/image cache 해제 및 비재생 시 redraw 최적화
@@ -353,6 +356,67 @@
   - [x] macOS arm64/x64, Linux x64/arm64 sidecar 파일 배치 후 `pnpm verify:ffmpeg-sidecars:all` 검증
 
 ---
+
+## 2026-09-06 리뷰 — 프리뷰 오디오 & 프리뷰/Export 불일치
+
+> TODO 점검 중 발견한, 완료로 표시되어 있었지만 실제로는 성립하지 않던 항목들과 신규 항목.
+> 기준선: `pnpm typecheck` / `pnpm lint` / `pnpm test --run` 통과, `pnpm build:vite` 정상.
+
+### 프리뷰 오디오 재생 (완료)
+
+- [x] **오디오 정책 모듈 분리** — `src/components/preview/previewAudio.ts`
+  - `collectActiveAudioSources`: Export의 `build_plan_from_payload`와 같은 선택 규칙
+    (audio 트랙 클립 + video 트랙 비디오의 embedded 오디오, hidden/overlay 트랙 제외)
+  - `getAudioSourceGain`: 오디오 클립은 `clip.opacity * track.opacity`를 0~4로 clamp,
+    embedded 오디오는 Export의 concat 세그먼트와 동일하게 감쇠 없음
+  - `getAudioElementVolume`: master volume/mute 반영 후 element 상한 1로 clamp
+  - `getAudioElementKey`: asset이 아닌 **clip 단위** element 소유
+  - `clampClipMediaTime`을 `canvasCompositor.ts`로 옮겨 video/audio가 공유
+- [x] **프리뷰 오디오 재생 연결** — `PreviewPlayer.tsx`
+  - audio 트랙 클립을 `HTMLAudioElement`로 재생 (기존에는 재생 경로 자체가 없었음)
+  - video 트랙 비디오 클립의 `muted` 고정을 해제해 embedded 오디오 재생
+  - overlay 트랙 비디오는 Export가 소리를 합성하지 않으므로 음소거 유지
+  - seek 정책은 기존 video 동기화와 동일 (정지 `0.08s` / 재생 `0.75s` drift)
+  - 클립 제거 / source URL 교체 / unmount 시 audio element 해제
+- [x] **볼륨·음소거 UI** — 컨트롤 바에 마스터 볼륨 슬라이더 + 음소거 토글, localStorage 영구 저장
+- [x] **오디오 회귀 테스트** — `previewAudio.test.ts` 15개 + `exportPayload.test.ts` 오디오 일치성 1개
+
+### 프리뷰 오디오 — 남은 작업
+
+- [ ] **오디오 파형/미터** — 재생 중 레벨 표시가 없어 무음 소스와 볼륨 0을 구분하기 어렵다
+- [ ] **오디오 페이드 프리뷰** — `fadeInDuration`/`fadeOutDuration`이 영상 불투명도에만 적용되고 게인에는 반영되지 않음
+  - Export도 오디오 페이드를 적용하지 않으므로, 프리뷰와 Export를 함께 정해야 한다
+- [ ] **트랙별 볼륨/음소거 속성** — 현재 오디오 게인은 `track.opacity`/`clip.opacity`를 빌려 쓰고 있어
+  "불투명도"라는 이름과 실제 의미가 어긋난다. `track.volume`/`track.muted` 도입 시 Export 스키마도 함께 변경
+- [ ] **오버레이 비디오 오디오 정책 결정** — 현재 Export가 overlay 트랙 오디오를 버리므로 프리뷰도 음소거한다.
+  오버레이 소리를 살릴지 결정하고 프리뷰·Export를 같이 바꾼다
+- [ ] **재생 시작 지연 확인** — `play()` 호출 시점의 버퍼링으로 첫 프레임 오디오가 늦게 시작하는지 실측
+
+### 프리뷰/Export 불일치 — 남은 작업 (우선순위 순)
+
+- [ ] **[P0] 비디오 렌더 경로 복구** — `PreviewPlayer.tsx`의 비디오 클립이
+  `ctx.drawImage(video, 0, 0, canvas.width, canvas.height)`로 캔버스 전체에 강제 stretch되어
+  `withClipTransform` / `getFitDrawRect`를 통째로 우회한다
+  - 증상 1: 소스와 캔버스 비율이 다르면 프리뷰는 늘어나고 Export는 레터박스(`pad`) → 결과가 다름
+  - 증상 2: overlay 트랙 비디오가 캔버스 전체를 덮어 PIP 프리뷰가 불가능 (Export는 `overlay=x:y`로 정상 배치)
+  - 증상 3: rotation / x·y·w·h / cropRect / 키프레임이 비디오에만 무반영
+  - 선행: 아래 fit/geometry characterization test
+  - 되돌릴 때 `비디오 맞춤 모드 비활성화`로 껐던 PropertiesPanel 맞춤 제어도 함께 복구
+- [ ] **[P1] video element 캐시 키를 clip 단위로 교체** — 현재 `asset.id` 기준이라
+  같은 에셋을 서로 다른 trim 구간의 두 클립으로 배치하고 동시에 활성화하면 하나의 element를 공유해
+  매 RAF마다 `currentTime`/`playbackRate` seek 경합이 발생한다
+  (오디오는 `getAudioElementKey`로 이미 clip 단위)
+- [ ] **[P1] Export에 rotation 반영** — Canvas는 `clip.rotation`을 렌더하지만 Rust 쪽에 대응 필터가 없다
+- [ ] **[P1] Export에 playbackRate 반영** — `types.rs`에 `playback_rate` 필드만 있고 filter graph에서 미사용
+  (`setpts` / `atempo` 필요)
+- [ ] **[P1] Export에 fade in/out 반영** — Rust에 `fade_in_duration`/`fade_out_duration` 필드 자체가 없다
+- [ ] **[P1] Export에 키프레임 반영** — Rust에 `keyframes` 필드 자체가 없다
+  - 위 4개를 당장 구현하지 않을 경우, 최소한 PropertiesPanel에서 **"프리뷰 전용"** 으로 표기할 것
+- [ ] **[P2] `center` fitMode 의미 통일** — Canvas는 원본 크기 유지 후 클리핑,
+  ffmpeg은 `scale='min(iw,W)':'min(ih,H)'`로 축소 후 pad → 소스가 캔버스보다 클 때 결과가 갈린다
+- [ ] **[P2] base 클립 배치 규칙 명문화** — Export는 video 트랙 클립의 `x/y/width/height`를 무시하고
+  캔버스 전체로 fit한다. 현재는 `normalizeMediaClipBoundsForCanvasResize`가 풀캔버스로 정규화해줘서
+  우연히 일치할 뿐이므로, 정규화가 깨지면 조용히 어긋난다
 
 ## Phase 11 — Feature-Sliced Design(FSD) 구조화 백로그
 
