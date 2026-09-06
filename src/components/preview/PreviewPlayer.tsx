@@ -18,18 +18,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ResizableDialog } from '../common/ResizableDialog'
 import {
   type ActiveLayer,
+  clampClipMediaTime,
   collectActiveLayers,
   drawImageLike,
   drawShapeClip,
   drawTextClip,
   getAssetUrl,
   getClipFadeOpacity,
-  getClipLocalTime,
   getContainedCanvasDisplaySize,
   getMediaSourceSize,
   hitTestLayers,
   withClipTransform,
 } from './canvasCompositor'
+import {
+  type ActiveAudioSource,
+  collectActiveAudioSources,
+  getAudioElementKey,
+  getAudioElementVolume,
+  getAudioSourceGain,
+  makeAudioSyncKey,
+} from './previewAudio'
 
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -90,17 +98,14 @@ const PREVIEW_ZOOM_OPTIONS: Array<{ value: PreviewZoom; label: string }> = [
 
 const PLAYING_SEEK_DRIFT_SECONDS = 0.75
 const PAUSED_SEEK_EPSILON_SECONDS = 0.08
+/** 프리뷰 마스터 볼륨. 사용자 조절 UI는 후속 단계에서 연결한다. */
+const DEFAULT_MASTER_VOLUME = 1
 
 function findTrackId(
   tracks: ReturnType<typeof useTimelineStore.getState>['tracks'],
   type: string
 ): string | null {
   return tracks.find((track) => track.type === type)?.id ?? null
-}
-
-function clampClipMediaTime(clip: Clip, timelineTime: number): number {
-  const targetTime = getClipLocalTime(clip, timelineTime)
-  return Math.max(clip.trimStart, Math.min(clip.trimEnd, targetTime))
 }
 
 function makeVideoSyncKey(clip: Clip): string {
@@ -173,6 +178,13 @@ function releaseImageElement(image: HTMLImageElement): void {
   image.removeAttribute('src')
 }
 
+function releaseAudioElement(audio: HTMLAudioElement): void {
+  audio.pause()
+  audio.onerror = null
+  audio.removeAttribute('src')
+  audio.load()
+}
+
 /** Phase 5 — Canvas 기반 합성 프리뷰 플레이어 */
 export function PreviewPlayer() {
   const assets = useAssetStore((s) => s.assets)
@@ -209,6 +221,9 @@ export function PreviewPlayer() {
   const videoCacheRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const videoSyncKeyRef = useRef<Map<string, string>>(new Map())
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  /** 오디오 element는 clip 단위로 소유한다 (동일 에셋을 여러 구간에 배치할 수 있음) */
+  const audioCacheRef = useRef<Map<string, HTMLAudioElement>>(new Map())
+  const audioSyncKeyRef = useRef<Map<string, string>>(new Map())
   const dragRef = useRef<{
     mode: 'move' | 'resize' | 'rotate'
     clipId: string
@@ -294,6 +309,16 @@ export function PreviewPlayer() {
     () => collectActiveLayers(tracks, assets, storeCurrentTime),
     [tracks, assets, storeCurrentTime]
   )
+
+  const activeAudioSources = useMemo(
+    () => collectActiveAudioSources(tracks, assets, storeCurrentTime),
+    [tracks, assets, storeCurrentTime]
+  )
+  const activeAudioSourcesRef = useRef<ActiveAudioSource[]>(activeAudioSources)
+
+  useEffect(() => {
+    activeAudioSourcesRef.current = activeAudioSources
+  }, [activeAudioSources])
 
   const selectedClip = useMemo(
     () => tracks.flatMap((track) => track.clips).find((clip) => clip.id === selectedClipId) ?? null,
@@ -381,7 +406,14 @@ export function PreviewPlayer() {
     (
       layers: ActiveLayer[],
       timelineTime: number,
-      options: { forceSeek: boolean; playing: boolean }
+      options: {
+        forceSeek: boolean
+        playing: boolean
+        /** embedded 오디오를 들려줘야 하는 에셋 (video 트랙 비디오 클립) */
+        audibleAssetIds: Set<string>
+        /** embedded 오디오에 적용할 element volume */
+        audioVolume: number
+      }
     ) => {
       const activeVideoAssetIds = new Set<string>()
 
@@ -415,7 +447,6 @@ export function PreviewPlayer() {
           }
           if (!video) {
             video = document.createElement('video')
-            video.muted = true
             video.playsInline = true
             video.preload = 'auto'
             video.onloadeddata = scheduleDrawFrame
@@ -427,6 +458,10 @@ export function PreviewPlayer() {
           }
           const targetTime = clampClipMediaTime(layer.clip, timelineTime)
           video.playbackRate = layer.clip.playbackRate ?? 1
+          // overlay 트랙 비디오는 Export가 소리를 합성하지 않으므로 프리뷰에서도 음소거한다.
+          const audible = options.audibleAssetIds.has(asset.id)
+          video.muted = !audible
+          video.volume = audible ? options.audioVolume : 0
           const syncKey = makeVideoSyncKey(layer.clip)
           const previousSyncKey = videoSyncKeyRef.current.get(asset.id)
           const drift = Math.abs(video.currentTime - targetTime)
@@ -455,10 +490,111 @@ export function PreviewPlayer() {
     [scheduleDrawFrame]
   )
 
+  const syncAudioElements = useCallback(
+    (
+      sources: ActiveAudioSource[],
+      timelineTime: number,
+      options: { forceSeek: boolean; playing: boolean; masterVolume: number; muted: boolean }
+    ) => {
+      const activeKeys = new Set<string>()
+
+      for (const source of sources) {
+        // 비디오에 포함된 오디오는 video element가 그대로 재생하므로 여기서 다루지 않는다.
+        if (source.kind !== 'audio') continue
+
+        const key = getAudioElementKey(source)
+        activeKeys.add(key)
+        const url = getAssetUrl(source.asset)
+
+        let audio = audioCacheRef.current.get(key)
+        if (audio && audio.dataset.sourceUrl !== url) {
+          releaseAudioElement(audio)
+          audioCacheRef.current.delete(key)
+          audioSyncKeyRef.current.delete(key)
+          audio = undefined
+        }
+        if (!audio) {
+          audio = new Audio()
+          audio.preload = 'auto'
+          audio.dataset.sourceUrl = url
+          audio.src = url
+          audioCacheRef.current.set(key, audio)
+        }
+
+        audio.playbackRate = source.clip.playbackRate ?? 1
+        audio.volume = getAudioElementVolume(
+          getAudioSourceGain(source),
+          options.masterVolume,
+          options.muted
+        )
+
+        const targetTime = clampClipMediaTime(source.clip, timelineTime)
+        const syncKey = makeAudioSyncKey(source.clip)
+        const previousSyncKey = audioSyncKeyRef.current.get(key)
+        const drift = Math.abs(audio.currentTime - targetTime)
+        const shouldSeek =
+          options.forceSeek ||
+          previousSyncKey !== syncKey ||
+          drift > (options.playing ? PLAYING_SEEK_DRIFT_SECONDS : PAUSED_SEEK_EPSILON_SECONDS)
+
+        if (Number.isFinite(targetTime) && shouldSeek) {
+          audio.currentTime = targetTime
+        }
+        audioSyncKeyRef.current.set(key, syncKey)
+
+        if (options.playing) {
+          if (audio.paused) void audio.play().catch(() => {})
+        } else {
+          audio.pause()
+        }
+      }
+
+      for (const [key, audio] of audioCacheRef.current) {
+        if (!activeKeys.has(key)) audio.pause()
+      }
+    },
+    []
+  )
+
+  /** video 트랙 비디오 클립의 embedded 오디오만 소리를 낸다 */
+  const audibleAssetIdsRef = useRef<Set<string>>(new Set())
+  const audibleAssetIds = useMemo(
+    () =>
+      new Set(
+        activeAudioSources
+          .filter((source) => source.kind === 'embedded')
+          .map((source) => source.asset.id)
+      ),
+    [activeAudioSources]
+  )
+
+  useEffect(() => {
+    audibleAssetIdsRef.current = audibleAssetIds
+  }, [audibleAssetIds])
+
   useEffect(() => {
     if (isPlaying) return
-    syncMediaElements(activeLayers, storeCurrentTime, { forceSeek: true, playing: false })
-  }, [activeLayers, isPlaying, storeCurrentTime, syncMediaElements])
+    syncMediaElements(activeLayers, storeCurrentTime, {
+      forceSeek: true,
+      playing: false,
+      audibleAssetIds,
+      audioVolume: getAudioElementVolume(1, DEFAULT_MASTER_VOLUME, false),
+    })
+    syncAudioElements(activeAudioSources, storeCurrentTime, {
+      forceSeek: true,
+      playing: false,
+      masterVolume: DEFAULT_MASTER_VOLUME,
+      muted: false,
+    })
+  }, [
+    activeAudioSources,
+    activeLayers,
+    audibleAssetIds,
+    isPlaying,
+    storeCurrentTime,
+    syncAudioElements,
+    syncMediaElements,
+  ])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -467,6 +603,14 @@ export function PreviewPlayer() {
       syncMediaElements(activeLayersRef.current, currentTimeRef.current, {
         forceSeek: false,
         playing: true,
+        audibleAssetIds: audibleAssetIdsRef.current,
+        audioVolume: getAudioElementVolume(1, DEFAULT_MASTER_VOLUME, false),
+      })
+      syncAudioElements(activeAudioSourcesRef.current, currentTimeRef.current, {
+        forceSeek: false,
+        playing: true,
+        masterVolume: DEFAULT_MASTER_VOLUME,
+        muted: false,
       })
       syncRaf = requestAnimationFrame(sync)
     }
@@ -474,7 +618,7 @@ export function PreviewPlayer() {
     return () => {
       if (syncRaf !== null) cancelAnimationFrame(syncRaf)
     }
-  }, [isPlaying, syncMediaElements])
+  }, [isPlaying, syncAudioElements, syncMediaElements])
 
   useEffect(() => {
     const activeAssetIds = new Set(assets.map((asset) => asset.id))
@@ -494,6 +638,19 @@ export function PreviewPlayer() {
       }
     }
   }, [assets])
+
+  // 오디오 element는 clip 소유이므로 클립이 타임라인에서 사라질 때 해제한다.
+  useEffect(() => {
+    const liveClipIds = new Set(tracks.flatMap((track) => track.clips).map((clip) => clip.id))
+
+    for (const [key, audio] of audioCacheRef.current) {
+      if (!liveClipIds.has(key)) {
+        releaseAudioElement(audio)
+        audioCacheRef.current.delete(key)
+        audioSyncKeyRef.current.delete(key)
+      }
+    }
+  }, [tracks])
 
   useEffect(() => {
     if (isPlaying) return
@@ -537,9 +694,14 @@ export function PreviewPlayer() {
       for (const image of imageCacheRef.current.values()) {
         releaseImageElement(image)
       }
+      for (const audio of audioCacheRef.current.values()) {
+        releaseAudioElement(audio)
+      }
       videoCacheRef.current.clear()
       videoSyncKeyRef.current.clear()
       imageCacheRef.current.clear()
+      audioCacheRef.current.clear()
+      audioSyncKeyRef.current.clear()
     },
     []
   )
