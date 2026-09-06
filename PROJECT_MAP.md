@@ -41,7 +41,7 @@
 | App shell, menus, project open/save, shortcuts | `src/components/app/GlobalAppBar.tsx` | `src/routes/__root.tsx`, `src/lib/useGlobalShortcuts.ts`, `src/store/projectStore.ts` |
 | Main editor layout | `src/components/EditorLayout.tsx` | `src/components/assets/AssetPanel.tsx`, `src/components/preview/PreviewPlayer.tsx`, `src/components/timeline/TimelinePanel.tsx`, `src/components/properties/PropertiesPanel.tsx` |
 | Asset import/drop/thumbnail list | `src/components/assets/AssetPanel.tsx` | `src/store/assetStore.ts`, `src/lib/mediaSource.ts`, `src-tauri/src/commands/asset.rs` |
-| Canvas preview/rendering | `src/components/preview/PreviewPlayer.tsx` | `src/components/preview/canvasCompositor.ts`, `src/components/preview/canvasCompositor.test.ts`, `src/store/timelineStore.ts` |
+| Canvas preview/rendering | `src/components/preview/PreviewPlayer.tsx` | `src/components/preview/canvasCompositor.ts`, `src/components/preview/canvasCompositor.test.ts`, `src/components/preview/previewAudio.ts`, `src/store/timelineStore.ts` |
 | Export dialog/progress | `src/components/preview/ExportDialog.tsx` | `src-tauri/src/commands/ffmpeg.rs`, `.github/skills/ffmpeg-integration/SKILL.md` |
 | Timeline tracks/clips/layers | `src/components/timeline/TimelinePanel.tsx` | `src/store/timelineStore.ts`, `.github/skills/timeline-editor/SKILL.md` |
 | Right properties/tool options | `src/components/properties/PropertiesPanel.tsx` | `src/store/toolStore.ts`, `src/store/timelineStore.ts` |
@@ -106,6 +106,8 @@
 | `src/components/preview/PreviewPlayer.tsx` | Canvas preview player, media sync, playback controls, canvas editing interactions. |
 | `src/components/preview/canvasCompositor.ts` | Pure compositor helpers for media/text/shape drawing, hit testing, fit calculations. |
 | `src/components/preview/canvasCompositor.test.ts` | Vitest coverage for compositor behavior. |
+| `src/components/preview/previewAudio.ts` | Pure preview audio policy: active source selection, gain, element key/sync key. Mirrors the ffmpeg export plan. |
+| `src/components/preview/previewAudio.test.ts` | Vitest coverage for preview audio source selection and gain. |
 | `src/components/preview/exportPayload.ts` | Pure ExportDialog payload builder and export resolution/FPS scaling helpers. |
 | `src/components/preview/exportPayload.test.ts` | Preview-to-export payload consistency fixture tests. |
 | `src/components/preview/ExportDialog.tsx` | Export options/progress dialog. |
