@@ -108,6 +108,11 @@
 | `src/components/preview/canvasCompositor.test.ts` | Vitest coverage for compositor behavior. |
 | `src/components/preview/previewAudio.ts` | Pure preview audio policy: active source selection, gain, element key/sync key. Mirrors the ffmpeg export plan. |
 | `src/components/preview/previewAudio.test.ts` | Vitest coverage for preview audio source selection and gain. |
+| `e2e/previewRender.spec.ts` | Playwright canvas pixel tests for preview fit/overlay/clip-rect rendering. |
+| `e2e/previewCanvas.ts` | E2E helpers: fixture import through the real file input, canvas pixel probes. |
+| `e2e/globalSetup.ts` | Generates e2e media fixtures before the Playwright run. |
+| `scripts/make-e2e-fixtures.mjs` | ffmpeg fixture generator for e2e (solid-color 4:3 / 16:9 sources). |
+| `src/lib/testBridge.ts` | DEV-only window bridge exposing stores so e2e can set up edit state deterministically. |
 | `src/components/preview/exportPayload.ts` | Pure ExportDialog payload builder and export resolution/FPS scaling helpers. |
 | `src/components/preview/exportPayload.test.ts` | Preview-to-export payload consistency fixture tests. |
 | `src/components/preview/ExportDialog.tsx` | Export options/progress dialog. |

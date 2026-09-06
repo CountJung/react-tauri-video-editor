@@ -669,6 +669,23 @@ export function PreviewPlayer() {
     }
   }, [assets, tracks])
 
+  /**
+   * canvas의 backing store 크기(그리기 좌표계)를 프로젝트 캔버스 크기에 맞춘다.
+   *
+   * JSX에서 `width`/`height`를 넘기지 않는다: 이 canvas는 MUI `Box component="canvas"`라
+   * width/height가 시스템 스타일 prop으로 흡수되어 HTML 속성으로 전달되지 않는다.
+   * 그 경우 backing store가 기본값 300x150으로 남아 프로젝트 좌표로 그린 레이어가
+   * 화면 밖으로 나간다. 속성은 여기서 직접 설정한다.
+   */
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    if (canvas.width === canvasWidth && canvas.height === canvasHeight) return
+    canvas.width = canvasWidth
+    canvas.height = canvasHeight
+    scheduleDrawFrame()
+  }, [canvasWidth, canvasHeight, scheduleDrawFrame])
+
   useEffect(() => {
     if (isPlaying) return
     scheduleDrawFrame({ activeLayers, canvasHeight, canvasWidth, cropEditing, selectedClip })
@@ -1040,8 +1057,6 @@ export function PreviewPlayer() {
           <Box
             component="canvas"
             ref={canvasRef}
-            width={canvasWidth}
-            height={canvasHeight}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
