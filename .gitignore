@@ -53,3 +53,10 @@ src-tauri/{env:HOME}/
 src-tauri/{env:USERPROFILE}/
 src-tauri/${env:HOME}/
 src-tauri/${env:USERPROFILE}/
+
+# Playwright
+/e2e/fixtures/
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/

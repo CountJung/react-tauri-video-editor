@@ -24,7 +24,8 @@ export default defineConfig({
   },
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
   test: {
-    exclude: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**', '**/._*'],
+    // e2e/*.spec.ts는 Playwright가 실행한다. vitest가 집으면 @playwright/test import로 깨진다.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**', '**/._*', '**/e2e/**'],
   },
   build: {
     target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
