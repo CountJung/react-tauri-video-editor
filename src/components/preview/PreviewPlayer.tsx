@@ -7,6 +7,8 @@ import { useTimelineStore } from '@/store/timelineStore'
 import { useToolStore } from '@/store/toolStore'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import VolumeOffIcon from '@mui/icons-material/VolumeOff'
+import VolumeUpIcon from '@mui/icons-material/VolumeUp'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
@@ -98,7 +100,7 @@ const PREVIEW_ZOOM_OPTIONS: Array<{ value: PreviewZoom; label: string }> = [
 
 const PLAYING_SEEK_DRIFT_SECONDS = 0.75
 const PAUSED_SEEK_EPSILON_SECONDS = 0.08
-/** 프리뷰 마스터 볼륨. 사용자 조절 UI는 후속 단계에서 연결한다. */
+/** 프리뷰 마스터 볼륨 기본값 (0~1) */
 const DEFAULT_MASTER_VOLUME = 1
 
 function findTrackId(
@@ -252,6 +254,21 @@ export function PreviewPlayer() {
     'fit',
     STORAGE_KEYS.PREVIEW_CANVAS_ZOOM
   )
+  const [masterVolume, setMasterVolume] = useStickyState<number>(
+    DEFAULT_MASTER_VOLUME,
+    STORAGE_KEYS.PREVIEW_VOLUME
+  )
+  const [isMuted, setIsMuted] = useStickyState<boolean>(false, STORAGE_KEYS.PREVIEW_MUTED)
+  const masterVolumeRef = useRef(masterVolume)
+  const isMutedRef = useRef(isMuted)
+
+  useEffect(() => {
+    masterVolumeRef.current = masterVolume
+  }, [masterVolume])
+
+  useEffect(() => {
+    isMutedRef.current = isMuted
+  }, [isMuted])
   const previewMaxScale = previewZoom === 'fit' ? null : Number(previewZoom) / 100
   const [fitCanvasSize, setFitCanvasSize] = useState({ width: canvasWidth, height: canvasHeight })
 
@@ -578,19 +595,21 @@ export function PreviewPlayer() {
       forceSeek: true,
       playing: false,
       audibleAssetIds,
-      audioVolume: getAudioElementVolume(1, DEFAULT_MASTER_VOLUME, false),
+      audioVolume: getAudioElementVolume(1, masterVolume, isMuted),
     })
     syncAudioElements(activeAudioSources, storeCurrentTime, {
       forceSeek: true,
       playing: false,
-      masterVolume: DEFAULT_MASTER_VOLUME,
-      muted: false,
+      masterVolume,
+      muted: isMuted,
     })
   }, [
     activeAudioSources,
     activeLayers,
     audibleAssetIds,
+    isMuted,
     isPlaying,
+    masterVolume,
     storeCurrentTime,
     syncAudioElements,
     syncMediaElements,
@@ -604,13 +623,13 @@ export function PreviewPlayer() {
         forceSeek: false,
         playing: true,
         audibleAssetIds: audibleAssetIdsRef.current,
-        audioVolume: getAudioElementVolume(1, DEFAULT_MASTER_VOLUME, false),
+        audioVolume: getAudioElementVolume(1, masterVolumeRef.current, isMutedRef.current),
       })
       syncAudioElements(activeAudioSourcesRef.current, currentTimeRef.current, {
         forceSeek: false,
         playing: true,
-        masterVolume: DEFAULT_MASTER_VOLUME,
-        muted: false,
+        masterVolume: masterVolumeRef.current,
+        muted: isMutedRef.current,
       })
       syncRaf = requestAnimationFrame(sync)
     }
@@ -1113,6 +1132,32 @@ export function PreviewPlayer() {
             {formatTime(isSliderDragging ? localCurrentTime : storeCurrentTime)} /{' '}
             {formatTime(totalDuration)}
           </Typography>
+          <IconButton
+            size="small"
+            onClick={() => setIsMuted((current) => !current)}
+            title={isMuted ? '음소거 해제' : '음소거'}
+            aria-label={isMuted ? '음소거 해제' : '음소거'}
+          >
+            {isMuted || masterVolume === 0 ? (
+              <VolumeOffIcon fontSize="small" />
+            ) : (
+              <VolumeUpIcon fontSize="small" />
+            )}
+          </IconButton>
+          <Slider
+            size="small"
+            min={0}
+            max={1}
+            step={0.01}
+            value={isMuted ? 0 : masterVolume}
+            onChange={(_event, value) => {
+              const next = Array.isArray(value) ? (value[0] ?? 0) : value
+              setMasterVolume(next)
+              if (next > 0 && isMuted) setIsMuted(false)
+            }}
+            aria-label="프리뷰 볼륨"
+            sx={{ width: 72, color: 'primary.main' }}
+          />
           {activeAssetName && (
             <Typography
               variant="caption"
